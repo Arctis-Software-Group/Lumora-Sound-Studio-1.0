@@ -148,30 +148,34 @@ function applyGraphSettings(nodes, context, options, isOffline = false) {
   });
 
   const lumoOn = options.enableLumo;
-  applyParam(nodes.dryGain?.gain, lumoOn ? 0.48 : 1);
-  applyParam(nodes.wetPreGain?.gain, lumoOn ? 1 : 0);
-  applyParam(nodes.lumoDepthGain?.gain, lumoOn ? 1 : 0);
-  applyParam(nodes.lumoSubEnhancer?.gain, lumoOn ? 5.8 : 0);
-  applyParam(nodes.lumoLowShelf?.gain, lumoOn ? 6.6 : 0);
-  applyParam(nodes.lumoPresence?.gain, lumoOn ? 4.2 : 0);
-  applyParam(nodes.lumoAir?.gain, lumoOn ? 3.4 : 0);
+  applyParam(nodes.dryGain?.gain, lumoOn ? 0.42 : 1);
+  applyParam(nodes.wetPreGain?.gain, lumoOn ? 1.15 : 0);
+  applyParam(nodes.lumoDepthGain?.gain, lumoOn ? 1.25 : 0);
+  applyParam(nodes.lumoSubEnhancer?.gain, lumoOn ? 7.2 : 0);
+  applyParam(nodes.lumoLowShelf?.gain, lumoOn ? 8.4 : 0);
+  applyParam(nodes.lumoMidBass?.gain, lumoOn ? 5.8 : 0);
+  applyParam(nodes.lumoPresence?.gain, lumoOn ? 5.6 : 0);
+  applyParam(nodes.lumoAir?.gain, lumoOn ? 4.8 : 0);
+  applyParam(nodes.lumoReverbGain?.gain, lumoOn ? 0.35 : 0);
 
   const spatialOn = options.enableSpatial;
-  const rotationSpeed = spatialOn ? options.spatialSpeed ?? 0.35 : 0.0001;
-  const orbitDepth = spatialOn ? options.spatialDepth ?? 1 : 0;
+  const rotationSpeed = spatialOn ? options.spatialSpeed ?? 0.42 : 0.0001;
+  const orbitDepth = spatialOn ? options.spatialDepth ?? 1.35 : 0;
   applyParam(nodes.spatialLFO?.frequency, rotationSpeed);
   applyParam(nodes.spatialLFODepth?.gain, orbitDepth);
-  applyParam(nodes.spatialOrbitGainX?.gain, spatialOn ? options.spatialOrbitRadius ?? 1.35 : 0);
-  applyParam(nodes.spatialOrbitGainZ?.gain, spatialOn ? options.spatialOrbitRadius ?? 1.35 : 0);
+  applyParam(nodes.spatialOrbitGainX?.gain, spatialOn ? options.spatialOrbitRadius ?? 1.85 : 0);
+  applyParam(nodes.spatialOrbitGainZ?.gain, spatialOn ? options.spatialOrbitRadius ?? 1.85 : 0);
   applyParam(nodes.spatialOrbitLFOX?.frequency, rotationSpeed);
   applyParam(nodes.spatialOrbitLFOZ?.frequency, rotationSpeed);
   const verticalRate = spatialOn
-    ? options.spatialVerticalRate ?? rotationSpeed * 0.72
+    ? options.spatialVerticalRate ?? rotationSpeed * 0.85
     : 0.0001;
-  applyParam(nodes.spatialElevation?.offset, spatialOn ? options.spatialElevation ?? 0.42 : 0);
-  applyParam(nodes.spatialForwardOffset?.offset, spatialOn ? options.spatialFrontBias ?? -0.6 : 0);
-  applyParam(nodes.spatialVerticalDepth?.gain, spatialOn ? options.spatialVerticalDepth ?? 0.38 : 0);
+  applyParam(nodes.spatialElevation?.offset, spatialOn ? options.spatialElevation ?? 0.58 : 0);
+  applyParam(nodes.spatialForwardOffset?.offset, spatialOn ? options.spatialFrontBias ?? -0.85 : 0);
+  applyParam(nodes.spatialVerticalDepth?.gain, spatialOn ? options.spatialVerticalDepth ?? 0.52 : 0);
   applyParam(nodes.spatialVerticalLFO?.frequency, verticalRate);
+  applyParam(nodes.spatialRearDepth?.gain, spatialOn ? options.spatialRearDepth ?? 0.65 : 0);
+  applyParam(nodes.spatialRearLFO?.frequency, spatialOn ? rotationSpeed * 0.63 : 0.0001);
   if (!spatialOn) {
     applyParam(nodes.stereoPanner?.pan, 0);
   }
@@ -208,43 +212,73 @@ function createAudioGraph(context, buffer, options, { isOffline = false } = {}) 
 
   nodes.lumoSubEnhancer = context.createBiquadFilter();
   nodes.lumoSubEnhancer.type = 'peaking';
-  nodes.lumoSubEnhancer.frequency.value = 65;
-  nodes.lumoSubEnhancer.Q.value = 1.1;
+  nodes.lumoSubEnhancer.frequency.value = 62;
+  nodes.lumoSubEnhancer.Q.value = 1.3;
   nodes.lumoSubEnhancer.gain.value = 0;
 
   nodes.lumoLowShelf = context.createBiquadFilter();
   nodes.lumoLowShelf.type = 'lowshelf';
-  nodes.lumoLowShelf.frequency.value = 120;
+  nodes.lumoLowShelf.frequency.value = 115;
+
+  nodes.lumoMidBass = context.createBiquadFilter();
+  nodes.lumoMidBass.type = 'peaking';
+  nodes.lumoMidBass.frequency.value = 280;
+  nodes.lumoMidBass.Q.value = 1.4;
+  nodes.lumoMidBass.gain.value = 0;
 
   nodes.lumoPresence = context.createBiquadFilter();
   nodes.lumoPresence.type = 'peaking';
-  nodes.lumoPresence.frequency.value = 3200;
-  nodes.lumoPresence.Q.value = 1.6;
+  nodes.lumoPresence.frequency.value = 3400;
+  nodes.lumoPresence.Q.value = 1.8;
 
   nodes.lumoAir = context.createBiquadFilter();
   nodes.lumoAir.type = 'highshelf';
-  nodes.lumoAir.frequency.value = 11800;
+  nodes.lumoAir.frequency.value = 12500;
 
   nodes.lumoDepthGain = context.createGain();
 
+  nodes.lumoReverb = context.createConvolver();
+  const reverbLength = context.sampleRate * 0.8;
+  const reverbBuffer = context.createBuffer(2, reverbLength, context.sampleRate);
+  let seed = 12345;
+  const seededRandom = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+  for (let channel = 0; channel < 2; channel++) {
+    const data = reverbBuffer.getChannelData(channel);
+    for (let i = 0; i < reverbLength; i++) {
+      data[i] = (seededRandom() * 2 - 1) * Math.pow(1 - i / reverbLength, 2.5);
+    }
+  }
+  nodes.lumoReverb.buffer = reverbBuffer;
+
+  nodes.lumoReverbGain = context.createGain();
+  nodes.lumoReverbGain.gain.value = 0;
+
   nodes.wetPreGain.connect(nodes.lumoSubEnhancer);
   nodes.lumoSubEnhancer.connect(nodes.lumoLowShelf);
-  nodes.lumoLowShelf.connect(nodes.lumoPresence);
+  nodes.lumoLowShelf.connect(nodes.lumoMidBass);
+  nodes.lumoMidBass.connect(nodes.lumoPresence);
   nodes.lumoPresence.connect(nodes.lumoAir);
   nodes.lumoAir.connect(nodes.lumoDepthGain);
+
+  nodes.lumoAir.connect(nodes.lumoReverb);
+  nodes.lumoReverb.connect(nodes.lumoReverbGain);
 
   nodes.spatialPanner = context.createPanner();
   nodes.spatialPanner.panningModel = 'HRTF';
   nodes.spatialPanner.distanceModel = 'inverse';
-  nodes.spatialPanner.refDistance = 1.2;
-  nodes.spatialPanner.maxDistance = 28;
-  nodes.spatialPanner.rolloffFactor = 0.95;
+  nodes.spatialPanner.refDistance = 1.0;
+  nodes.spatialPanner.maxDistance = 35;
+  nodes.spatialPanner.rolloffFactor = 1.15;
   nodes.spatialPanner.coneInnerAngle = 360;
   nodes.spatialPanner.coneOuterAngle = 0;
 
   nodes.stereoPanner = context.createStereoPanner();
   nodes.dryGain.connect(nodes.spatialPanner);
   nodes.lumoDepthGain.connect(nodes.spatialPanner);
+  nodes.lumoReverbGain.connect(nodes.spatialPanner);
   nodes.spatialPanner.connect(nodes.stereoPanner);
 
   nodes.spatialLFO = context.createOscillator();
@@ -253,7 +287,7 @@ function createAudioGraph(context, buffer, options, { isOffline = false } = {}) 
   nodes.spatialLFODepth.gain.value = 0;
   nodes.spatialLFO.connect(nodes.spatialLFODepth);
   nodes.spatialLFODepth.connect(nodes.stereoPanner.pan);
-  const rotationSpeed = options.spatialSpeed ?? 0.35;
+  const rotationSpeed = options.spatialSpeed ?? 0.42;
   try {
     nodes.spatialLFO.frequency.value = rotationSpeed;
   } catch (error) {
@@ -262,7 +296,7 @@ function createAudioGraph(context, buffer, options, { isOffline = false } = {}) 
   nodes.spatialLFO.start(0);
   nodes.spatialOrbitGainX = context.createGain();
   nodes.spatialOrbitGainZ = context.createGain();
-  const initialOrbitRadius = options.enableSpatial ? options.spatialOrbitRadius ?? 1.35 : 0;
+  const initialOrbitRadius = options.enableSpatial ? options.spatialOrbitRadius ?? 1.85 : 0;
   nodes.spatialOrbitGainX.gain.value = initialOrbitRadius;
   nodes.spatialOrbitGainZ.gain.value = initialOrbitRadius;
 
@@ -288,31 +322,45 @@ function createAudioGraph(context, buffer, options, { isOffline = false } = {}) 
   nodes.spatialOrbitGainZ.connect(nodes.spatialPanner.positionZ);
 
   nodes.spatialForwardOffset = context.createConstantSource();
-  nodes.spatialForwardOffset.offset.value = options.enableSpatial ? options.spatialFrontBias ?? -0.6 : 0;
+  nodes.spatialForwardOffset.offset.value = options.enableSpatial ? options.spatialFrontBias ?? -0.85 : 0;
   nodes.spatialForwardOffset.connect(nodes.spatialPanner.positionZ);
 
   nodes.spatialElevation = context.createConstantSource();
-  nodes.spatialElevation.offset.value = options.enableSpatial ? options.spatialElevation ?? 0.42 : 0;
+  nodes.spatialElevation.offset.value = options.enableSpatial ? options.spatialElevation ?? 0.58 : 0;
   nodes.spatialElevation.connect(nodes.spatialPanner.positionY);
   nodes.spatialElevation.start(0);
 
   nodes.spatialVerticalLFO = context.createOscillator();
   nodes.spatialVerticalLFO.type = 'sine';
-  const verticalRate = options.spatialVerticalRate ?? rotationSpeed * 0.72;
+  const verticalRate = options.spatialVerticalRate ?? rotationSpeed * 0.85;
   try {
     nodes.spatialVerticalLFO.frequency.value = verticalRate;
   } catch (error) {
     nodes.spatialVerticalLFO.frequency.setValueAtTime(verticalRate, 0);
   }
   nodes.spatialVerticalDepth = context.createGain();
-  nodes.spatialVerticalDepth.gain.value = options.enableSpatial ? options.spatialVerticalDepth ?? 0.38 : 0;
+  nodes.spatialVerticalDepth.gain.value = options.enableSpatial ? options.spatialVerticalDepth ?? 0.52 : 0;
   nodes.spatialVerticalLFO.connect(nodes.spatialVerticalDepth);
   nodes.spatialVerticalDepth.connect(nodes.spatialPanner.positionY);
+
+  nodes.spatialRearLFO = context.createOscillator();
+  nodes.spatialRearLFO.type = 'triangle';
+  const rearRate = rotationSpeed * 0.63;
+  try {
+    nodes.spatialRearLFO.frequency.value = rearRate;
+  } catch (error) {
+    nodes.spatialRearLFO.frequency.setValueAtTime(rearRate, 0);
+  }
+  nodes.spatialRearDepth = context.createGain();
+  nodes.spatialRearDepth.gain.value = options.enableSpatial ? options.spatialRearDepth ?? 0.65 : 0;
+  nodes.spatialRearLFO.connect(nodes.spatialRearDepth);
+  nodes.spatialRearDepth.connect(nodes.spatialPanner.positionZ);
 
   nodes.spatialForwardOffset.start(0);
   nodes.spatialOrbitLFOX.start(0);
   nodes.spatialOrbitLFOZ.start(0);
   nodes.spatialVerticalLFO.start(0);
+  nodes.spatialRearLFO.start(0);
   if (isOffline) {
     const stopAt = options.bufferDuration ?? buffer.duration;
     try {
@@ -326,6 +374,7 @@ function createAudioGraph(context, buffer, options, { isOffline = false } = {}) 
       nodes.spatialElevation.stop(stopAt + 0.1);
       nodes.spatialForwardOffset.stop(stopAt + 0.1);
       nodes.spatialVerticalLFO.stop(stopAt + 0.1);
+      nodes.spatialRearLFO.stop(stopAt + 0.1);
     } catch {
       /* noop */
     }
@@ -334,25 +383,67 @@ function createAudioGraph(context, buffer, options, { isOffline = false } = {}) 
   let postNode = nodes.stereoPanner;
 
   if (options.separation === 'vocals') {
-    nodes.separationFilter = context.createBiquadFilter();
-    nodes.separationFilter.type = 'bandpass';
-    nodes.separationFilter.frequency.value = 2600;
-    nodes.separationFilter.Q.value = 1.8;
-    postNode.connect(nodes.separationFilter);
-    postNode = nodes.separationFilter;
+    nodes.vocalHighpass = context.createBiquadFilter();
+    nodes.vocalHighpass.type = 'highpass';
+    nodes.vocalHighpass.frequency.value = 180;
+    nodes.vocalHighpass.Q.value = 0.8;
+
+    nodes.vocalLowpass = context.createBiquadFilter();
+    nodes.vocalLowpass.type = 'lowpass';
+    nodes.vocalLowpass.frequency.value = 7500;
+    nodes.vocalLowpass.Q.value = 0.9;
+
+    nodes.vocalBandpass1 = context.createBiquadFilter();
+    nodes.vocalBandpass1.type = 'peaking';
+    nodes.vocalBandpass1.frequency.value = 1200;
+    nodes.vocalBandpass1.Q.value = 2.2;
+    nodes.vocalBandpass1.gain.value = 6.5;
+
+    nodes.vocalBandpass2 = context.createBiquadFilter();
+    nodes.vocalBandpass2.type = 'peaking';
+    nodes.vocalBandpass2.frequency.value = 2800;
+    nodes.vocalBandpass2.Q.value = 2.4;
+    nodes.vocalBandpass2.gain.value = 8.2;
+
+    nodes.vocalBandpass3 = context.createBiquadFilter();
+    nodes.vocalBandpass3.type = 'peaking';
+    nodes.vocalBandpass3.frequency.value = 4500;
+    nodes.vocalBandpass3.Q.value = 1.8;
+    nodes.vocalBandpass3.gain.value = 5.8;
+
+    postNode.connect(nodes.vocalHighpass);
+    nodes.vocalHighpass.connect(nodes.vocalLowpass);
+    nodes.vocalLowpass.connect(nodes.vocalBandpass1);
+    nodes.vocalBandpass1.connect(nodes.vocalBandpass2);
+    nodes.vocalBandpass2.connect(nodes.vocalBandpass3);
+    postNode = nodes.vocalBandpass3;
   } else if (options.separation === 'instrumentals') {
     nodes.instrumentLowShelf = context.createBiquadFilter();
     nodes.instrumentLowShelf.type = 'lowshelf';
-    nodes.instrumentLowShelf.frequency.value = 210;
-    nodes.instrumentLowShelf.gain.value = 3;
+    nodes.instrumentLowShelf.frequency.value = 190;
+    nodes.instrumentLowShelf.gain.value = 4.5;
+
+    nodes.instrumentMidCut = context.createBiquadFilter();
+    nodes.instrumentMidCut.type = 'peaking';
+    nodes.instrumentMidCut.frequency.value = 2400;
+    nodes.instrumentMidCut.Q.value = 2.6;
+    nodes.instrumentMidCut.gain.value = -8.5;
 
     nodes.instrumentHighShelf = context.createBiquadFilter();
     nodes.instrumentHighShelf.type = 'highshelf';
-    nodes.instrumentHighShelf.frequency.value = 3800;
-    nodes.instrumentHighShelf.gain.value = 2;
+    nodes.instrumentHighShelf.frequency.value = 4200;
+    nodes.instrumentHighShelf.gain.value = 3.2;
+
+    nodes.instrumentLowBoost = context.createBiquadFilter();
+    nodes.instrumentLowBoost.type = 'peaking';
+    nodes.instrumentLowBoost.frequency.value = 85;
+    nodes.instrumentLowBoost.Q.value = 1.3;
+    nodes.instrumentLowBoost.gain.value = 5.5;
 
     postNode.connect(nodes.instrumentLowShelf);
-    nodes.instrumentLowShelf.connect(nodes.instrumentHighShelf);
+    nodes.instrumentLowShelf.connect(nodes.instrumentLowBoost);
+    nodes.instrumentLowBoost.connect(nodes.instrumentMidCut);
+    nodes.instrumentMidCut.connect(nodes.instrumentHighShelf);
     postNode = nodes.instrumentHighShelf;
   }
 
@@ -387,6 +478,7 @@ function destroyGraph() {
     nodes.spatialElevation?.stop(0);
     nodes.spatialForwardOffset?.stop(0);
     nodes.spatialVerticalLFO?.stop(0);
+    nodes.spatialRearLFO?.stop(0);
   } catch {
     /* noop */
   }
@@ -398,13 +490,14 @@ function getCurrentOptions(overrides = {}) {
     eqValues: [...state.eqValues],
     enableSpatial: state.spatialEnabled,
     enableLumo: state.lumoEnabled,
-    spatialSpeed: 0.35,
-    spatialDepth: 1,
-    spatialOrbitRadius: 1.35,
-    spatialElevation: 0.42,
-    spatialFrontBias: -0.6,
-    spatialVerticalDepth: 0.38,
-    spatialVerticalRate: 0.25,
+    spatialSpeed: 0.42,
+    spatialDepth: 1.35,
+    spatialOrbitRadius: 1.85,
+    spatialElevation: 0.58,
+    spatialFrontBias: -0.85,
+    spatialVerticalDepth: 0.52,
+    spatialVerticalRate: 0.357,
+    spatialRearDepth: 0.65,
     masterGain: 0.95,
     bufferDuration: state.audioBuffer?.duration ?? 0,
     ...overrides,
