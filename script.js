@@ -148,15 +148,30 @@ function applyGraphSettings(nodes, context, options, isOffline = false) {
   });
 
   const lumoOn = options.enableLumo;
-  applyParam(nodes.dryGain?.gain, lumoOn ? 0.5 : 1);
+  applyParam(nodes.dryGain?.gain, lumoOn ? 0.48 : 1);
   applyParam(nodes.wetPreGain?.gain, lumoOn ? 1 : 0);
   applyParam(nodes.lumoDepthGain?.gain, lumoOn ? 1 : 0);
-  applyParam(nodes.lumoLowShelf?.gain, lumoOn ? 5.5 : 0);
-  applyParam(nodes.lumoPresence?.gain, lumoOn ? 4 : 0);
-  applyParam(nodes.lumoAir?.gain, lumoOn ? 3.2 : 0);
+  applyParam(nodes.lumoSubEnhancer?.gain, lumoOn ? 5.8 : 0);
+  applyParam(nodes.lumoLowShelf?.gain, lumoOn ? 6.6 : 0);
+  applyParam(nodes.lumoPresence?.gain, lumoOn ? 4.2 : 0);
+  applyParam(nodes.lumoAir?.gain, lumoOn ? 3.4 : 0);
 
   const spatialOn = options.enableSpatial;
-  applyParam(nodes.spatialLFODepth?.gain, spatialOn ? options.spatialDepth ?? 0.9 : 0);
+  const rotationSpeed = spatialOn ? options.spatialSpeed ?? 0.35 : 0.0001;
+  const orbitDepth = spatialOn ? options.spatialDepth ?? 1 : 0;
+  applyParam(nodes.spatialLFO?.frequency, rotationSpeed);
+  applyParam(nodes.spatialLFODepth?.gain, orbitDepth);
+  applyParam(nodes.spatialOrbitGainX?.gain, spatialOn ? options.spatialOrbitRadius ?? 1.35 : 0);
+  applyParam(nodes.spatialOrbitGainZ?.gain, spatialOn ? options.spatialOrbitRadius ?? 1.35 : 0);
+  applyParam(nodes.spatialOrbitLFOX?.frequency, rotationSpeed);
+  applyParam(nodes.spatialOrbitLFOZ?.frequency, rotationSpeed);
+  const verticalRate = spatialOn
+    ? options.spatialVerticalRate ?? rotationSpeed * 0.72
+    : 0.0001;
+  applyParam(nodes.spatialElevation?.offset, spatialOn ? options.spatialElevation ?? 0.42 : 0);
+  applyParam(nodes.spatialForwardOffset?.offset, spatialOn ? options.spatialFrontBias ?? -0.6 : 0);
+  applyParam(nodes.spatialVerticalDepth?.gain, spatialOn ? options.spatialVerticalDepth ?? 0.38 : 0);
+  applyParam(nodes.spatialVerticalLFO?.frequency, verticalRate);
   if (!spatialOn) {
     applyParam(nodes.stereoPanner?.pan, 0);
   }
@@ -191,6 +206,12 @@ function createAudioGraph(context, buffer, options, { isOffline = false } = {}) 
   lastNode.connect(nodes.dryGain);
   lastNode.connect(nodes.wetPreGain);
 
+  nodes.lumoSubEnhancer = context.createBiquadFilter();
+  nodes.lumoSubEnhancer.type = 'peaking';
+  nodes.lumoSubEnhancer.frequency.value = 65;
+  nodes.lumoSubEnhancer.Q.value = 1.1;
+  nodes.lumoSubEnhancer.gain.value = 0;
+
   nodes.lumoLowShelf = context.createBiquadFilter();
   nodes.lumoLowShelf.type = 'lowshelf';
   nodes.lumoLowShelf.frequency.value = 120;
@@ -206,14 +227,25 @@ function createAudioGraph(context, buffer, options, { isOffline = false } = {}) 
 
   nodes.lumoDepthGain = context.createGain();
 
-  nodes.wetPreGain.connect(nodes.lumoLowShelf);
+  nodes.wetPreGain.connect(nodes.lumoSubEnhancer);
+  nodes.lumoSubEnhancer.connect(nodes.lumoLowShelf);
   nodes.lumoLowShelf.connect(nodes.lumoPresence);
   nodes.lumoPresence.connect(nodes.lumoAir);
   nodes.lumoAir.connect(nodes.lumoDepthGain);
 
+  nodes.spatialPanner = context.createPanner();
+  nodes.spatialPanner.panningModel = 'HRTF';
+  nodes.spatialPanner.distanceModel = 'inverse';
+  nodes.spatialPanner.refDistance = 1.2;
+  nodes.spatialPanner.maxDistance = 28;
+  nodes.spatialPanner.rolloffFactor = 0.95;
+  nodes.spatialPanner.coneInnerAngle = 360;
+  nodes.spatialPanner.coneOuterAngle = 0;
+
   nodes.stereoPanner = context.createStereoPanner();
-  nodes.dryGain.connect(nodes.stereoPanner);
-  nodes.lumoDepthGain.connect(nodes.stereoPanner);
+  nodes.dryGain.connect(nodes.spatialPanner);
+  nodes.lumoDepthGain.connect(nodes.spatialPanner);
+  nodes.spatialPanner.connect(nodes.stereoPanner);
 
   nodes.spatialLFO = context.createOscillator();
   nodes.spatialLFO.type = 'sine';
@@ -221,17 +253,79 @@ function createAudioGraph(context, buffer, options, { isOffline = false } = {}) 
   nodes.spatialLFODepth.gain.value = 0;
   nodes.spatialLFO.connect(nodes.spatialLFODepth);
   nodes.spatialLFODepth.connect(nodes.stereoPanner.pan);
-  const rotationSpeed = options.spatialSpeed ?? 0.28;
+  const rotationSpeed = options.spatialSpeed ?? 0.35;
   try {
     nodes.spatialLFO.frequency.value = rotationSpeed;
   } catch (error) {
     nodes.spatialLFO.frequency.setValueAtTime(rotationSpeed, 0);
   }
   nodes.spatialLFO.start(0);
+  nodes.spatialOrbitGainX = context.createGain();
+  nodes.spatialOrbitGainZ = context.createGain();
+  const initialOrbitRadius = options.enableSpatial ? options.spatialOrbitRadius ?? 1.35 : 0;
+  nodes.spatialOrbitGainX.gain.value = initialOrbitRadius;
+  nodes.spatialOrbitGainZ.gain.value = initialOrbitRadius;
+
+  nodes.spatialOrbitLFOX = context.createOscillator();
+  nodes.spatialOrbitLFOX.type = 'sine';
+  try {
+    nodes.spatialOrbitLFOX.frequency.value = rotationSpeed;
+  } catch (error) {
+    nodes.spatialOrbitLFOX.frequency.setValueAtTime(rotationSpeed, 0);
+  }
+  nodes.spatialOrbitLFOX.connect(nodes.spatialOrbitGainX);
+  nodes.spatialOrbitGainX.connect(nodes.spatialPanner.positionX);
+
+  nodes.spatialOrbitLFOZ = context.createOscillator();
+  const cosWave = context.createPeriodicWave(new Float32Array([0, 1]), new Float32Array([0, 0]));
+  nodes.spatialOrbitLFOZ.setPeriodicWave(cosWave);
+  try {
+    nodes.spatialOrbitLFOZ.frequency.value = rotationSpeed;
+  } catch (error) {
+    nodes.spatialOrbitLFOZ.frequency.setValueAtTime(rotationSpeed, 0);
+  }
+  nodes.spatialOrbitLFOZ.connect(nodes.spatialOrbitGainZ);
+  nodes.spatialOrbitGainZ.connect(nodes.spatialPanner.positionZ);
+
+  nodes.spatialForwardOffset = context.createConstantSource();
+  nodes.spatialForwardOffset.offset.value = options.enableSpatial ? options.spatialFrontBias ?? -0.6 : 0;
+  nodes.spatialForwardOffset.connect(nodes.spatialPanner.positionZ);
+
+  nodes.spatialElevation = context.createConstantSource();
+  nodes.spatialElevation.offset.value = options.enableSpatial ? options.spatialElevation ?? 0.42 : 0;
+  nodes.spatialElevation.connect(nodes.spatialPanner.positionY);
+  nodes.spatialElevation.start(0);
+
+  nodes.spatialVerticalLFO = context.createOscillator();
+  nodes.spatialVerticalLFO.type = 'sine';
+  const verticalRate = options.spatialVerticalRate ?? rotationSpeed * 0.72;
+  try {
+    nodes.spatialVerticalLFO.frequency.value = verticalRate;
+  } catch (error) {
+    nodes.spatialVerticalLFO.frequency.setValueAtTime(verticalRate, 0);
+  }
+  nodes.spatialVerticalDepth = context.createGain();
+  nodes.spatialVerticalDepth.gain.value = options.enableSpatial ? options.spatialVerticalDepth ?? 0.38 : 0;
+  nodes.spatialVerticalLFO.connect(nodes.spatialVerticalDepth);
+  nodes.spatialVerticalDepth.connect(nodes.spatialPanner.positionY);
+
+  nodes.spatialForwardOffset.start(0);
+  nodes.spatialOrbitLFOX.start(0);
+  nodes.spatialOrbitLFOZ.start(0);
+  nodes.spatialVerticalLFO.start(0);
   if (isOffline) {
     const stopAt = options.bufferDuration ?? buffer.duration;
     try {
       nodes.spatialLFO.stop(stopAt + 0.1);
+    } catch {
+      /* noop */
+    }
+    try {
+      nodes.spatialOrbitLFOX.stop(stopAt + 0.1);
+      nodes.spatialOrbitLFOZ.stop(stopAt + 0.1);
+      nodes.spatialElevation.stop(stopAt + 0.1);
+      nodes.spatialForwardOffset.stop(stopAt + 0.1);
+      nodes.spatialVerticalLFO.stop(stopAt + 0.1);
     } catch {
       /* noop */
     }
@@ -287,6 +381,15 @@ function destroyGraph() {
   } catch {
     /* noop */
   }
+  try {
+    nodes.spatialOrbitLFOX?.stop(0);
+    nodes.spatialOrbitLFOZ?.stop(0);
+    nodes.spatialElevation?.stop(0);
+    nodes.spatialForwardOffset?.stop(0);
+    nodes.spatialVerticalLFO?.stop(0);
+  } catch {
+    /* noop */
+  }
   state.graph = null;
 }
 
@@ -295,8 +398,13 @@ function getCurrentOptions(overrides = {}) {
     eqValues: [...state.eqValues],
     enableSpatial: state.spatialEnabled,
     enableLumo: state.lumoEnabled,
-    spatialSpeed: 0.28,
-    spatialDepth: 0.92,
+    spatialSpeed: 0.35,
+    spatialDepth: 1,
+    spatialOrbitRadius: 1.35,
+    spatialElevation: 0.42,
+    spatialFrontBias: -0.6,
+    spatialVerticalDepth: 0.38,
+    spatialVerticalRate: 0.25,
     masterGain: 0.95,
     bufferDuration: state.audioBuffer?.duration ?? 0,
     ...overrides,
