@@ -240,10 +240,15 @@ function createAudioGraph(context, buffer, options, { isOffline = false } = {}) 
   nodes.lumoReverb = context.createConvolver();
   const reverbLength = context.sampleRate * 0.8;
   const reverbBuffer = context.createBuffer(2, reverbLength, context.sampleRate);
+  let seed = 12345;
+  const seededRandom = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
   for (let channel = 0; channel < 2; channel++) {
     const data = reverbBuffer.getChannelData(channel);
     for (let i = 0; i < reverbLength; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / reverbLength, 2.5);
+      data[i] = (seededRandom() * 2 - 1) * Math.pow(1 - i / reverbLength, 2.5);
     }
   }
   nodes.lumoReverb.buffer = reverbBuffer;
@@ -491,7 +496,7 @@ function getCurrentOptions(overrides = {}) {
     spatialElevation: 0.58,
     spatialFrontBias: -0.85,
     spatialVerticalDepth: 0.52,
-    spatialVerticalRate: 0.36,
+    spatialVerticalRate: 0.357,
     spatialRearDepth: 0.65,
     masterGain: 0.95,
     bufferDuration: state.audioBuffer?.duration ?? 0,
