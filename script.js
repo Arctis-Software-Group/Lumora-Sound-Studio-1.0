@@ -156,7 +156,7 @@ function applyGraphSettings(nodes, context, options, isOffline = false) {
   applyParam(nodes.lumoMidBass?.gain, lumoOn ? 5.8 : 0);
   applyParam(nodes.lumoPresence?.gain, lumoOn ? 5.6 : 0);
   applyParam(nodes.lumoAir?.gain, lumoOn ? 4.8 : 0);
-  applyParam(nodes.lumoReverb?.gain, lumoOn ? 0.35 : 0);
+  applyParam(nodes.lumoReverbGain?.gain, lumoOn ? 0.35 : 0);
 
   const spatialOn = options.enableSpatial;
   const rotationSpeed = spatialOn ? options.spatialSpeed ?? 0.42 : 0.0001;
