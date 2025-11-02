@@ -1,0 +1,669 @@
+const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+const OfflineAudioContextClass = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+
+const ui = {
+  fileInput: document.getElementById('fileInput'),
+  uploadPanel: document.querySelector('.upload-panel'),
+  fileName: document.querySelector('.file-name'),
+  durationLabel: document.getElementById('durationLabel'),
+  sampleRateLabel: document.getElementById('sampleRateLabel'),
+  durationText: document.getElementById('totalTimeLabel'),
+  currentTimeText: document.getElementById('currentTimeLabel'),
+  timeline: document.getElementById('timelineProgress'),
+  playButton: document.getElementById('playButton'),
+  pauseButton: document.getElementById('pauseButton'),
+  rewindButton: document.getElementById('rewindButton'),
+  downloadProcessed: document.getElementById('downloadProcessed'),
+  downloadVocals: document.getElementById('downloadVocals'),
+  downloadInstrumentals: document.getElementById('downloadInstrumentals'),
+  spatialToggle: document.getElementById('spatialToggle'),
+  lumoToggle: document.getElementById('lumoToggle'),
+  eqSliders: Array.from(document.querySelectorAll('.eq-slider input[type="range"]')),
+  toast: document.getElementById('toast'),
+  footerYear: document.getElementById('footerYear'),
+  topBar: document.querySelector('.top-bar'),
+  navToggle: document.querySelector('.nav-toggle'),
+  navLinks: Array.from(document.querySelectorAll('.main-nav a')),
+  ctaButtons: Array.from(document.querySelectorAll('.cta-scroll')),
+};
+
+const EQ_FREQUENCIES = [60, 170, 350, 1000, 3500, 10000];
+
+const state = {
+  audioContext: null,
+  audioBuffer: null,
+  graph: null,
+  eqValues: EQ_FREQUENCIES.map(() => 0),
+  spatialEnabled: true,
+  lumoEnabled: true,
+  startTime: 0,
+  pausedAt: 0,
+  isPlaying: false,
+  rafId: null,
+  fileName: '',
+  toastTimer: null,
+};
+
+function formatTime(seconds = 0) {
+  if (!Number.isFinite(seconds) || seconds < 0) seconds = 0;
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function showToast(message) {
+  if (!ui.toast) return;
+  ui.toast.textContent = message;
+  ui.toast.classList.add('is-visible');
+  if (state.toastTimer) {
+    clearTimeout(state.toastTimer);
+  }
+  state.toastTimer = setTimeout(() => {
+    ui.toast.classList.remove('is-visible');
+  }, 3200);
+}
+
+function updateFooterYear() {
+  if (ui.footerYear) {
+    ui.footerYear.textContent = new Date().getFullYear();
+  }
+}
+
+function cancelProgressLoop() {
+  if (state.rafId) {
+    cancelAnimationFrame(state.rafId);
+    state.rafId = null;
+  }
+}
+
+function startProgressLoop() {
+  cancelProgressLoop();
+  const loop = () => {
+    if (!state.audioBuffer) {
+      ui.timeline.style.width = '0%';
+      ui.currentTimeText.textContent = '0:00';
+      state.rafId = requestAnimationFrame(loop);
+      return;
+    }
+
+    let elapsed = state.pausedAt;
+    if (state.isPlaying && state.audioContext) {
+      elapsed = state.audioContext.currentTime - state.startTime;
+    }
+    elapsed = clamp(elapsed, 0, state.audioBuffer.duration);
+
+    const progress = state.audioBuffer.duration ? elapsed / state.audioBuffer.duration : 0;
+    ui.timeline.style.width = `${Math.min(progress * 100, 100)}%`;
+    ui.currentTimeText.textContent = formatTime(elapsed);
+    ui.durationText.textContent = formatTime(state.audioBuffer.duration);
+    state.rafId = requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+async function ensureAudioContext() {
+  if (!AudioContextClass) {
+    throw new Error('お使いのブラウザは Web Audio API に対応していません');
+  }
+  if (!state.audioContext) {
+    state.audioContext = new AudioContextClass();
+  }
+  if (state.audioContext.state === 'suspended') {
+    await state.audioContext.resume();
+  }
+  return state.audioContext;
+}
+
+function applyGraphSettings(nodes, context, options, isOffline = false) {
+  const applyParam = (param, value) => {
+    if (!param) return;
+    try {
+      if (isOffline) {
+        if (typeof param.setValueAtTime === 'function') {
+          param.setValueAtTime(value, 0);
+        } else {
+          param.value = value;
+        }
+      } else if (typeof param.setTargetAtTime === 'function') {
+        param.setTargetAtTime(value, context.currentTime, 0.05);
+      } else if (typeof param.setValueAtTime === 'function') {
+        param.setValueAtTime(value, context.currentTime);
+      } else {
+        param.value = value;
+      }
+    } catch {
+      if ('value' in param) {
+        param.value = value;
+      }
+    }
+  };
+
+  nodes.eqFilters?.forEach((filter, index) => {
+    const gain = options.eqValues?.[index] ?? 0;
+    applyParam(filter.gain, clamp(gain, -12, 12));
+  });
+
+  const lumoOn = options.enableLumo;
+  applyParam(nodes.dryGain?.gain, lumoOn ? 0.5 : 1);
+  applyParam(nodes.wetPreGain?.gain, lumoOn ? 1 : 0);
+  applyParam(nodes.lumoDepthGain?.gain, lumoOn ? 1 : 0);
+  applyParam(nodes.lumoLowShelf?.gain, lumoOn ? 5.5 : 0);
+  applyParam(nodes.lumoPresence?.gain, lumoOn ? 4 : 0);
+  applyParam(nodes.lumoAir?.gain, lumoOn ? 3.2 : 0);
+
+  const spatialOn = options.enableSpatial;
+  applyParam(nodes.spatialLFODepth?.gain, spatialOn ? options.spatialDepth ?? 0.9 : 0);
+  if (!spatialOn) {
+    applyParam(nodes.stereoPanner?.pan, 0);
+  }
+
+  applyParam(nodes.masterGain?.gain, options.masterGain ?? 0.95);
+}
+
+function createAudioGraph(context, buffer, options, { isOffline = false } = {}) {
+  const nodes = {};
+
+  nodes.source = context.createBufferSource();
+  nodes.source.buffer = buffer;
+
+  nodes.inputGain = context.createGain();
+  nodes.source.connect(nodes.inputGain);
+
+  let lastNode = nodes.inputGain;
+
+  nodes.eqFilters = EQ_FREQUENCIES.map((frequency, index) => {
+    const filter = context.createBiquadFilter();
+    filter.type = 'peaking';
+    filter.frequency.value = frequency;
+    filter.Q.value = frequency >= 1000 ? 1.4 : 1.2;
+    filter.gain.value = options.eqValues?.[index] ?? 0;
+    lastNode.connect(filter);
+    lastNode = filter;
+    return filter;
+  });
+
+  nodes.dryGain = context.createGain();
+  nodes.wetPreGain = context.createGain();
+  lastNode.connect(nodes.dryGain);
+  lastNode.connect(nodes.wetPreGain);
+
+  nodes.lumoLowShelf = context.createBiquadFilter();
+  nodes.lumoLowShelf.type = 'lowshelf';
+  nodes.lumoLowShelf.frequency.value = 120;
+
+  nodes.lumoPresence = context.createBiquadFilter();
+  nodes.lumoPresence.type = 'peaking';
+  nodes.lumoPresence.frequency.value = 3200;
+  nodes.lumoPresence.Q.value = 1.6;
+
+  nodes.lumoAir = context.createBiquadFilter();
+  nodes.lumoAir.type = 'highshelf';
+  nodes.lumoAir.frequency.value = 11800;
+
+  nodes.lumoDepthGain = context.createGain();
+
+  nodes.wetPreGain.connect(nodes.lumoLowShelf);
+  nodes.lumoLowShelf.connect(nodes.lumoPresence);
+  nodes.lumoPresence.connect(nodes.lumoAir);
+  nodes.lumoAir.connect(nodes.lumoDepthGain);
+
+  nodes.stereoPanner = context.createStereoPanner();
+  nodes.dryGain.connect(nodes.stereoPanner);
+  nodes.lumoDepthGain.connect(nodes.stereoPanner);
+
+  nodes.spatialLFO = context.createOscillator();
+  nodes.spatialLFO.type = 'sine';
+  nodes.spatialLFODepth = context.createGain();
+  nodes.spatialLFODepth.gain.value = 0;
+  nodes.spatialLFO.connect(nodes.spatialLFODepth);
+  nodes.spatialLFODepth.connect(nodes.stereoPanner.pan);
+  const rotationSpeed = options.spatialSpeed ?? 0.28;
+  try {
+    nodes.spatialLFO.frequency.value = rotationSpeed;
+  } catch (error) {
+    nodes.spatialLFO.frequency.setValueAtTime(rotationSpeed, 0);
+  }
+  nodes.spatialLFO.start(0);
+  if (isOffline) {
+    const stopAt = options.bufferDuration ?? buffer.duration;
+    try {
+      nodes.spatialLFO.stop(stopAt + 0.1);
+    } catch {
+      /* noop */
+    }
+  }
+
+  let postNode = nodes.stereoPanner;
+
+  if (options.separation === 'vocals') {
+    nodes.separationFilter = context.createBiquadFilter();
+    nodes.separationFilter.type = 'bandpass';
+    nodes.separationFilter.frequency.value = 2600;
+    nodes.separationFilter.Q.value = 1.8;
+    postNode.connect(nodes.separationFilter);
+    postNode = nodes.separationFilter;
+  } else if (options.separation === 'instrumentals') {
+    nodes.instrumentLowShelf = context.createBiquadFilter();
+    nodes.instrumentLowShelf.type = 'lowshelf';
+    nodes.instrumentLowShelf.frequency.value = 210;
+    nodes.instrumentLowShelf.gain.value = 3;
+
+    nodes.instrumentHighShelf = context.createBiquadFilter();
+    nodes.instrumentHighShelf.type = 'highshelf';
+    nodes.instrumentHighShelf.frequency.value = 3800;
+    nodes.instrumentHighShelf.gain.value = 2;
+
+    postNode.connect(nodes.instrumentLowShelf);
+    nodes.instrumentLowShelf.connect(nodes.instrumentHighShelf);
+    postNode = nodes.instrumentHighShelf;
+  }
+
+  nodes.masterGain = context.createGain();
+  nodes.masterGain.gain.value = options.masterGain ?? 0.95;
+
+  postNode.connect(nodes.masterGain);
+  nodes.masterGain.connect(context.destination);
+
+  applyGraphSettings(nodes, context, options, isOffline);
+
+  return nodes;
+}
+
+function destroyGraph() {
+  if (!state.graph?.nodes) return;
+  const { nodes } = state.graph;
+  try {
+    nodes.source.onended = null;
+    nodes.source.stop(0);
+  } catch {
+    /* noop */
+  }
+  try {
+    nodes.spatialLFO?.stop(0);
+  } catch {
+    /* noop */
+  }
+  state.graph = null;
+}
+
+function getCurrentOptions(overrides = {}) {
+  return {
+    eqValues: [...state.eqValues],
+    enableSpatial: state.spatialEnabled,
+    enableLumo: state.lumoEnabled,
+    spatialSpeed: 0.28,
+    spatialDepth: 0.92,
+    masterGain: 0.95,
+    bufferDuration: state.audioBuffer?.duration ?? 0,
+    ...overrides,
+  };
+}
+
+async function startPlayback(offset = 0) {
+  if (!state.audioBuffer) {
+    showToast('音声ファイルをアップロードしてください');
+    return;
+  }
+
+  try {
+    const context = await ensureAudioContext();
+    destroyGraph();
+
+    const options = getCurrentOptions();
+    const nodes = createAudioGraph(context, state.audioBuffer, options);
+    state.graph = { nodes };
+
+    state.startTime = context.currentTime - offset;
+    state.pausedAt = 0;
+    nodes.source.onended = () => {
+      if (state.graph?.nodes === nodes) {
+        handlePlaybackEnded();
+      }
+    };
+    nodes.source.start(0, offset);
+    state.isPlaying = true;
+    updateButtonStates();
+    startProgressLoop();
+  } catch (error) {
+    console.error(error);
+    showToast('再生を開始できませんでした');
+  }
+}
+
+function pausePlayback() {
+  if (!state.isPlaying || !state.audioContext || !state.graph?.nodes) return;
+  const elapsed = state.audioContext.currentTime - state.startTime;
+  state.pausedAt = clamp(elapsed, 0, state.audioBuffer?.duration ?? 0);
+  state.isPlaying = false;
+  destroyGraph();
+  updateButtonStates();
+}
+
+function stopPlayback() {
+  destroyGraph();
+  state.isPlaying = false;
+  state.pausedAt = 0;
+  updateButtonStates();
+}
+
+function handlePlaybackEnded() {
+  state.isPlaying = false;
+  state.pausedAt = state.audioBuffer?.duration ?? 0;
+  state.graph = null;
+  ui.timeline.style.width = '100%';
+  ui.currentTimeText.textContent = formatTime(state.pausedAt);
+  updateButtonStates();
+}
+
+function updateButtonStates() {
+  const hasAudio = Boolean(state.audioBuffer);
+  ui.playButton.disabled = !hasAudio;
+  ui.pauseButton.disabled = !state.isPlaying;
+  ui.rewindButton.disabled = !hasAudio;
+  ui.downloadProcessed.disabled = !hasAudio;
+  ui.downloadVocals.disabled = !hasAudio;
+  ui.downloadInstrumentals.disabled = !hasAudio;
+}
+
+function updateFileInfo(file) {
+  const duration = state.audioBuffer?.duration ?? 0;
+  const sampleRate = state.audioBuffer?.sampleRate ?? 0;
+  ui.fileName.textContent = file ? file.name : '音声ファイルが選択されていません';
+  ui.durationLabel.textContent = file ? `${formatTime(duration)} (${duration.toFixed(1)} 秒)` : '--:--';
+  ui.sampleRateLabel.textContent = file ? `${Math.round(sampleRate)} Hz` : '-- Hz';
+  ui.durationText.textContent = formatTime(duration);
+  ui.currentTimeText.textContent = '0:00';
+  ui.timeline.style.width = '0%';
+  const info = document.querySelector('.file-info');
+  if (file && info) {
+    info.dataset.status = 'ready';
+  }
+}
+
+async function decodeFile(file) {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const context = await ensureAudioContext();
+    const audioBuffer = await context.decodeAudioData(arrayBuffer.slice(0));
+    state.audioBuffer = audioBuffer;
+    state.fileName = file.name.replace(/\s+/g, '-').toLowerCase();
+    state.pausedAt = 0;
+    state.isPlaying = false;
+    destroyGraph();
+    updateFileInfo(file);
+    updateButtonStates();
+    startProgressLoop();
+    showToast('音声ファイルを読み込みました');
+  } catch (error) {
+    console.error(error);
+    showToast('音声ファイルの読み込みに失敗しました');
+  }
+}
+
+function handleFileSelection(file) {
+  if (!file) return;
+  const isAudio = file.type.startsWith('audio/');
+  if (!isAudio) {
+    showToast('音声ファイルを選択してください');
+    return;
+  }
+  decodeFile(file);
+}
+
+async function renderOffline(options) {
+  if (!state.audioBuffer) {
+    throw new Error('音声ファイルがロードされていません');
+  }
+  if (!OfflineAudioContextClass) {
+    throw new Error('オフラインレンダリングに対応していないブラウザです');
+  }
+  const buffer = state.audioBuffer;
+  const offlineContext = new OfflineAudioContextClass(2, buffer.length, buffer.sampleRate);
+  const nodes = createAudioGraph(offlineContext, buffer, options, { isOffline: true });
+  nodes.source.start(0);
+  const rendered = await offlineContext.startRendering();
+  return rendered;
+}
+
+function audioBufferToWave(abuffer) {
+  const numOfChan = abuffer.numberOfChannels;
+  const sampleRate = abuffer.sampleRate;
+  const formatLength = abuffer.length * numOfChan * 2 + 44;
+  const buffer = new ArrayBuffer(formatLength);
+  const view = new DataView(buffer);
+  let offset = 0;
+
+  const writeString = (str) => {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset++, str.charCodeAt(i));
+    }
+  };
+
+  writeString('RIFF');
+  view.setUint32(offset, formatLength - 8, true);
+  offset += 4;
+  writeString('WAVE');
+  writeString('fmt ');
+  view.setUint32(offset, 16, true);
+  offset += 4;
+  view.setUint16(offset, 1, true);
+  offset += 2;
+  view.setUint16(offset, numOfChan, true);
+  offset += 2;
+  view.setUint32(offset, sampleRate, true);
+  offset += 4;
+  view.setUint32(offset, sampleRate * numOfChan * 2, true);
+  offset += 4;
+  view.setUint16(offset, numOfChan * 2, true);
+  offset += 2;
+  view.setUint16(offset, 16, true);
+  offset += 2;
+  writeString('data');
+  view.setUint32(offset, formatLength - 44, true);
+  offset += 4;
+
+  const channels = [];
+  for (let i = 0; i < numOfChan; i++) {
+    channels.push(abuffer.getChannelData(i));
+  }
+
+  const interleaved = new Float32Array(abuffer.length * numOfChan);
+  for (let i = 0; i < abuffer.length; i++) {
+    for (let channel = 0; channel < numOfChan; channel++) {
+      interleaved[i * numOfChan + channel] = channels[channel][i];
+    }
+  }
+
+  let idx = 0;
+  while (offset < formatLength) {
+    const sample = clamp(interleaved[idx++], -1, 1);
+    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+    offset += 2;
+  }
+
+  return buffer;
+}
+
+async function handleDownload(mode) {
+  if (!state.audioBuffer) {
+    showToast('先に音声ファイルを読み込んでください');
+    return;
+  }
+
+  let toastMessage = 'レンダリングしています…';
+  if (mode === 'processed') toastMessage = '効果音をレンダリング中…';
+  if (mode === 'vocals') toastMessage = 'ボーカルを抽出中…';
+  if (mode === 'instrumentals') toastMessage = '楽器パートを抽出中…';
+  showToast(toastMessage);
+
+  try {
+    const options = getCurrentOptions();
+
+    if (mode === 'vocals') {
+      options.separation = 'vocals';
+      options.enableSpatial = false;
+      options.enableLumo = false;
+    } else if (mode === 'instrumentals') {
+      options.separation = 'instrumentals';
+      options.enableSpatial = false;
+      options.enableLumo = false;
+    }
+
+    const rendered = await renderOffline(options);
+    const wavBuffer = audioBufferToWave(rendered);
+    const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const baseName = state.fileName ? state.fileName.replace(/\.[^/.]+$/, '') : 'lumora-audio';
+    const suffix =
+      mode === 'vocals' ? 'vocals' : mode === 'instrumentals' ? 'instrumentals' : 'processed';
+    link.href = url;
+    link.download = `${baseName}-${suffix}.wav`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showToast('ダウンロードが完了しました');
+  } catch (error) {
+    console.error(error);
+    showToast('ダウンロードに失敗しました');
+  }
+}
+
+function setupEQControls() {
+  ui.eqSliders.forEach((slider, index) => {
+    const valueLabel = slider.parentElement?.querySelector('.eq-value');
+    slider.addEventListener('input', (event) => {
+      const value = Number(event.target.value);
+      state.eqValues[index] = value;
+      if (valueLabel) {
+        const displayValue = Number.isInteger(value) ? value : value.toFixed(1);
+        valueLabel.textContent = `${value > 0 ? '+' : ''}${displayValue} dB`;
+      }
+      if (state.graph?.nodes && state.audioContext) {
+        applyGraphSettings(state.graph.nodes, state.audioContext, getCurrentOptions());
+      }
+    });
+  });
+}
+
+function setupToggles() {
+  ui.spatialToggle.addEventListener('change', (event) => {
+    state.spatialEnabled = event.target.checked;
+    if (state.graph?.nodes && state.audioContext) {
+      applyGraphSettings(state.graph.nodes, state.audioContext, getCurrentOptions());
+    }
+  });
+
+  ui.lumoToggle.addEventListener('change', (event) => {
+    state.lumoEnabled = event.target.checked;
+    if (state.graph?.nodes && state.audioContext) {
+      applyGraphSettings(state.graph.nodes, state.audioContext, getCurrentOptions());
+    }
+  });
+}
+
+function setupTransport() {
+  ui.playButton.addEventListener('click', () => {
+    const offset = state.pausedAt || 0;
+    startPlayback(offset);
+  });
+
+  ui.pauseButton.addEventListener('click', () => {
+    pausePlayback();
+  });
+
+  ui.rewindButton.addEventListener('click', () => {
+    stopPlayback();
+    ui.timeline.style.width = '0%';
+    ui.currentTimeText.textContent = '0:00';
+  });
+}
+
+function setupDownloadButtons() {
+  ui.downloadProcessed.addEventListener('click', () => handleDownload('processed'));
+  ui.downloadVocals.addEventListener('click', () => handleDownload('vocals'));
+  ui.downloadInstrumentals.addEventListener('click', () => handleDownload('instrumentals'));
+}
+
+function setupFileInput() {
+  ui.fileInput.addEventListener('change', (event) => {
+    const file = event.target.files?.[0];
+    handleFileSelection(file);
+  });
+
+  if (ui.uploadPanel) {
+    ['dragenter', 'dragover'].forEach((eventName) => {
+      ui.uploadPanel.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        ui.uploadPanel.classList.add('is-dragging');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach((eventName) => {
+      ui.uploadPanel.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        ui.uploadPanel.classList.remove('is-dragging');
+      });
+    });
+
+    ui.uploadPanel.addEventListener('drop', (event) => {
+      const file = event.dataTransfer?.files?.[0];
+      handleFileSelection(file);
+    });
+  }
+}
+
+function setupNavigation() {
+  if (ui.navToggle) {
+    ui.navToggle.addEventListener('click', () => {
+      ui.topBar.classList.toggle('is-open');
+    });
+  }
+
+  ui.navLinks.forEach((link) => {
+    link.addEventListener('click', (event) => {
+      const href = link.getAttribute('href');
+      if (href && href.startsWith('#')) {
+        const target = document.querySelector(href);
+        if (target) {
+          event.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+      ui.topBar.classList.remove('is-open');
+    });
+  });
+
+  ui.ctaButtons.forEach((button) => {
+    button.addEventListener('click', (event) => {
+      const targetSelector = button.dataset.target;
+      const target = targetSelector ? document.querySelector(targetSelector) : null;
+      if (target) {
+        event.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        ui.topBar.classList.remove('is-open');
+      }
+    });
+  });
+}
+
+function init() {
+  updateFooterYear();
+  setupNavigation();
+  setupFileInput();
+  setupTransport();
+  setupEQControls();
+  setupToggles();
+  setupDownloadButtons();
+  updateButtonStates();
+  startProgressLoop();
+}
+
+init();
