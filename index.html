@@ -191,6 +191,41 @@
                 </p>
               </div>
             </div>
+            <div class="reverb-panel" aria-labelledby="reverbTitle">
+              <div class="reverb-header">
+                <div>
+                  <h3 id="reverbTitle">Room &amp; Reverb</h3>
+                  <p class="reverb-subtitle">実在の空間を再現したインパルス応答とアーリー反射を組み合わせて調整します。</p>
+                </div>
+                <div class="reverb-preset-select">
+                  <label for="reverbPreset">プリセット</label>
+                  <select id="reverbPreset" aria-describedby="reverbDescription"></select>
+                </div>
+              </div>
+              <p class="reverb-description" id="reverbDescription">プリセットを読み込んでください。</p>
+              <div class="reverb-slider-grid">
+                <div class="slider-control">
+                  <label for="reverbEarly">アーリー反射ミックス</label>
+                  <input type="range" id="reverbEarly" min="0" max="1" step="0.01" value="0.42" />
+                  <span class="slider-value" data-slider="reverbEarly">42%</span>
+                </div>
+                <div class="slider-control">
+                  <label for="reverbMix">リバーブミックス</label>
+                  <input type="range" id="reverbMix" min="0" max="1.2" step="0.01" value="0.6" />
+                  <span class="slider-value" data-slider="reverbMix">60%</span>
+                </div>
+                <div class="slider-control">
+                  <label for="reverbDecay">減衰倍率</label>
+                  <input type="range" id="reverbDecay" min="0.4" max="1.6" step="0.01" value="1.0" />
+                  <span class="slider-value" data-slider="reverbDecay">1.00×</span>
+                </div>
+                <div class="slider-control">
+                  <label for="stereoWidth">ステレオ幅</label>
+                  <input type="range" id="stereoWidth" min="0" max="1.6" step="0.01" value="1" />
+                  <span class="slider-value" data-slider="stereoWidth">100%</span>
+                </div>
+              </div>
+            </div>
             <div class="equalizer" aria-labelledby="equalizerTitle">
               <div class="equalizer-header">
                 <h3 id="equalizerTitle">6 バンド イコライザー</h3>
@@ -232,6 +267,53 @@
             <div class="download-actions">
               <button class="primary wide" id="downloadProcessed" disabled>加工した音をダウンロード</button>
               <p class="download-note">すべてローカルで処理され、プライバシーは守られます。</p>
+            </div>
+          </div>
+
+          <div class="panel space-panel">
+            <div class="panel-header">
+              <h3>3D スペース</h3>
+              <p>音源とリスナーの位置を視覚的に調整</p>
+            </div>
+            <div class="space-canvas-wrap">
+              <canvas
+                id="spaceCanvas"
+                width="420"
+                height="320"
+                role="img"
+                aria-label="3D シーンの空間マップ"
+              ></canvas>
+            </div>
+            <div class="space-controls">
+              <div class="space-row">
+                <button class="ghost" id="spaceReset">位置をリセット</button>
+                <button class="ghost" id="spacePreviewToggle" aria-pressed="false">モーションプレビュー</button>
+              </div>
+              <div class="space-grid">
+                <div class="slider-control">
+                  <label for="listenerYaw">リスナー ヨー</label>
+                  <input type="range" id="listenerYaw" min="-180" max="180" step="1" value="0" />
+                  <span class="slider-value" data-slider="listenerYaw">0°</span>
+                </div>
+                <div class="slider-control">
+                  <label for="listenerPitch">ピッチ</label>
+                  <input type="range" id="listenerPitch" min="-90" max="90" step="1" value="0" />
+                  <span class="slider-value" data-slider="listenerPitch">0°</span>
+                </div>
+                <div class="slider-control">
+                  <label for="listenerRoll">ロール</label>
+                  <input type="range" id="listenerRoll" min="-180" max="180" step="1" value="0" />
+                  <span class="slider-value" data-slider="listenerRoll">0°</span>
+                </div>
+                <div class="slider-control">
+                  <label for="sourceHeight">ソース高さ</label>
+                  <input type="range" id="sourceHeight" min="0" max="3" step="0.01" value="1.5" />
+                  <span class="slider-value" data-slider="sourceHeight">1.50 m</span>
+                </div>
+              </div>
+              <div class="space-meta" id="spaceMeta" role="status" aria-live="polite">
+                ソース X: 0.00 m / Y: 1.50 m / Z: -1.80 m
+              </div>
             </div>
           </div>
 

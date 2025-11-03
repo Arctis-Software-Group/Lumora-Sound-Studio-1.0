@@ -1,0 +1,67 @@
+{
+  "sampleRate": 48000,
+  "positions": [
+    {
+      "azimuth": 0,
+      "elevation": 0,
+      "file": "azp0_elp0.wav"
+    },
+    {
+      "azimuth": 0,
+      "elevation": 30,
+      "file": "azp0_elp30.wav"
+    },
+    {
+      "azimuth": 0,
+      "elevation": -30,
+      "file": "azp0_elm30.wav"
+    },
+    {
+      "azimuth": 45,
+      "elevation": 0,
+      "file": "azp45_elp0.wav"
+    },
+    {
+      "azimuth": 90,
+      "elevation": 0,
+      "file": "azp90_elp0.wav"
+    },
+    {
+      "azimuth": 135,
+      "elevation": 0,
+      "file": "azp135_elp0.wav"
+    },
+    {
+      "azimuth": 180,
+      "elevation": 0,
+      "file": "azp180_elp0.wav"
+    },
+    {
+      "azimuth": -45,
+      "elevation": 0,
+      "file": "azm45_elp0.wav"
+    },
+    {
+      "azimuth": -90,
+      "elevation": 0,
+      "file": "azm90_elp0.wav"
+    },
+    {
+      "azimuth": -135,
+      "elevation": 0,
+      "file": "azm135_elp0.wav"
+    },
+    {
+      "azimuth": 45,
+      "elevation": 25,
+      "file": "azp45_elp25.wav"
+    },
+    {
+      "azimuth": -45,
+      "elevation": 25,
+      "file": "azm45_elp25.wav"
+    }
+  ],
+  "interpolation": "nearest-two",
+  "fallbackPannerMode": "HRTF"
+}

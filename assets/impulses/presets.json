@@ -1,0 +1,48 @@
+{
+  "presets": [
+    {
+      "id": "concert-hall",
+      "label": "Concert Hall",
+      "description": "長い残響尾と広がりを持つクラシックホールの空気感",
+      "file": "concert-hall.wav",
+      "decaySeconds": 2.6,
+      "recommendedPreDelay": 0.032,
+      "defaultEarlyMix": 0.42,
+      "defaultReverbMix": 0.68,
+      "defaultWidth": 0.92
+    },
+    {
+      "id": "studio-room",
+      "label": "Studio Room",
+      "description": "吸音パネルの効いたタイトでコントロールしやすい残響",
+      "file": "studio-room.wav",
+      "decaySeconds": 1.1,
+      "recommendedPreDelay": 0.015,
+      "defaultEarlyMix": 0.35,
+      "defaultReverbMix": 0.4,
+      "defaultWidth": 0.6
+    },
+    {
+      "id": "outdoor-expanse",
+      "label": "Outdoor Expanse",
+      "description": "反射が少なく遠景が霞むような野外空間",
+      "file": "outdoor-expanse.wav",
+      "decaySeconds": 1.4,
+      "recommendedPreDelay": 0.02,
+      "defaultEarlyMix": 0.28,
+      "defaultReverbMix": 0.32,
+      "defaultWidth": 1.1
+    },
+    {
+      "id": "vintage-plate",
+      "label": "Vintage Plate",
+      "description": "歌モノに合う密度の高いクラシックプレートサウンド",
+      "file": "vintage-plate.wav",
+      "decaySeconds": 1.3,
+      "recommendedPreDelay": 0.01,
+      "defaultEarlyMix": 0.5,
+      "defaultReverbMix": 0.55,
+      "defaultWidth": 1.05
+    }
+  ]
+}
