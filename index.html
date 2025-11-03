@@ -1,322 +1,165 @@
 <!DOCTYPE html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lumora Sound Studio 1.0</title>
-    <meta
-      name="description"
-      content="Lumora Sound Studio 1.0 は、16D 立体音響と Lumo 音響を搭載した没入型のブラウザサウンドスタジオです。" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap"
-      rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lumora Sound Studio 1.0 - 16D立体音響スタジオ</title>
+    <meta name="description" content="Lumora Sound Studio 1.0 は、16D 立体音響と Lumo 音響を搭載した没入型のブラウザサウンドスタジオです。">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
     <header class="top-bar" id="top">
-      <div class="brand">
-        <span class="brand-mark">Lumora</span>
-        <span class="brand-sub">Sound Studio <strong>1.0</strong></span>
-      </div>
-      <nav class="main-nav" aria-label="主要ナビゲーション">
-        <a href="#features">特長</a>
-        <a href="#studio">スタジオ</a>
-        <a href="#separation">音源分離</a>
-        <a href="#pricing">料金</a>
-      </nav>
-      <button class="primary-action cta-scroll" data-target="#studio">今すぐ体験</button>
-      <button class="nav-toggle" aria-label="メニューを開閉">
-        <span></span><span></span><span></span>
-      </button>
+        <div class="brand">
+            <span class="brand-mark">✨ Lumora</span>
+            <span class="brand-sub">Sound Studio <strong>1.0</strong></span>
+        </div>
+        <nav class="main-nav" aria-label="主要ナビゲーション">
+            <a href="#features">特長</a>
+            <a href="#studio">スタジオ</a>
+            <a href="#separation">音源分離</a>
+            <a href="#pricing">料金</a>
+        </nav>
+        <button class="primary-action cta-scroll" data-target="#studio">🎵 今すぐ体験</button>
+        <button class="nav-toggle" aria-label="メニューを開閉">☰</button>
     </header>
 
     <main>
-      <section class="hero" aria-labelledby="hero-title">
-        <div class="hero-overlay"></div>
-        <div class="hero-content">
-          <p class="eyebrow">16D Immersive Audio + Lumo Perfect Spatial Sound</p>
-          <h1 id="hero-title">まるで音が身体を巡る、新しい音響制作体験を。</h1>
-          <p class="hero-copy">
-            Lumora Sound Studio 1.0 は、誰でもブラウザ上で立体音響をデザインできるサウンドスタジオです。16D 立体音響と独自の Lumo 音響が織りなす超没入感が、あなたの音を次の次元へ連れていきます。
-          </p>
-          <div class="hero-actions">
-            <button class="primary-action cta-scroll" data-target="#studio">スタジオを開く</button>
-            <button class="secondary-action cta-scroll" data-target="#features">機能を見る</button>
-          </div>
-          <dl class="hero-meta">
-            <div>
-              <dt>アカウント登録不要</dt>
-              <dd>すべて無料で、無制限に利用可能</dd>
-            </div>
-            <div>
-              <dt>16D + Lumo</dt>
-              <dd>回転する音像と完璧な立体感を同時に</dd>
-            </div>
-            <div>
-              <dt>音源分離 &amp; ダウンロード</dt>
-              <dd>ボーカルも楽器もワンクリックで保存</dd>
-            </div>
-          </dl>
-        </div>
-      </section>
-
-      <section class="section features" id="features" aria-labelledby="features-title">
-        <div class="section-header">
-          <p class="eyebrow">Features</p>
-          <h2 id="features-title">Lumora が実現する 4 つのキーテクノロジー</h2>
-          <p class="section-copy">
-            鮮烈な立体音響、Lumo 音響による極上の奥行きと重低音、美しいイコライザー、そして音源分離まで。すべてがひとつの画面で完結します。
-          </p>
-        </div>
-        <div class="feature-grid">
-          <article class="feature-card">
-            <h3>16D 立体音響エンジン</h3>
-            <p>
-              四方八方から音が回り込むダイナミックなサウンド。多軸モーションと後方・垂直方向の制御で、ライブ会場のような完全な没入体験を再現します。
-            </p>
-            <ul>
-              <li>強化されたステレオパンと3軸空間モーションコントロール</li>
-              <li>最適化された回転スピードと深さ、垂直・後方モーション</li>
-              <li>ライブ会場の迫力を再現する高度なHRTF処理</li>
-            </ul>
-          </article>
-          <article class="feature-card">
-            <h3>Lumo 音響</h3>
-            <p>
-              より深く、より立体的。強化された重低音の躍動とライブ会場のような空気感・残響を同時に再現する Lumora 独自のサウンドプロファイルです。
-            </p>
-            <ul>
-              <li>低域・中域・高域を更に精密にブースト</li>
-              <li>ライブ会場を再現する自然な残響効果</li>
-              <li>スイッチひとつで完全没入モードに</li>
-            </ul>
-          </article>
-          <article class="feature-card">
-            <h3>6 バンド・スタジオ EQ</h3>
-            <p>
-              60Hz〜10kHz をカバーする 6 バンドのイコライザーで、音のキャラクターを思い通りに調整。視認性の高い UI で微細なニュアンスにも即応します。
-            </p>
-            <ul>
-              <li>プロ仕様の Q 設定で自然なカーブ</li>
-              <li>±12dB のゲインレンジ</li>
-              <li>リアルタイムで効き具合をモニタリング</li>
-            </ul>
-          </article>
-          <article class="feature-card">
-            <h3>音源分離 &amp; ダウンロード</h3>
-            <p>
-              強化された多段階フィルタリングでボーカルと楽器をより正確に抽出し、即座に WAV として保存。ライブ配信のハモり作りからリミックス制作まで、ワークフローを一気に加速します。
-            </p>
-            <ul>
-              <li>高精度な多段階ボーカル分離フィルター</li>
-              <li>楽器パートのみの最適化された生成</li>
-              <li>高速レンダリングで即ダウンロード</li>
-            </ul>
-          </article>
-        </div>
-      </section>
-
-      <section class="section studio" id="studio" aria-labelledby="studio-title">
-        <div class="section-header">
-          <p class="eyebrow">Studio</p>
-          <h2 id="studio-title">Lumora Sound Studio</h2>
-          <p class="section-copy">
-            ブラウザひとつでプロダクション品質の立体音響を作成。アップロード、再生、調整、そしてダウンロードまで、すべてリアルタイムに操作できます。
-          </p>
-        </div>
-        <div class="studio-grid">
-          <div class="panel upload-panel">
-            <div class="panel-header">
-              <h3>音源をセット</h3>
-              <p>ドラッグ &amp; ドロップ、またはファイル選択でスタート</p>
-            </div>
-            <label class="file-input" for="fileInput">
-              <span class="file-instruction">音声ファイルをアップロード</span>
-              <input id="fileInput" type="file" accept="audio/*" />
-            </label>
-            <div class="file-info" data-status="empty">
-              <p class="file-name">音声ファイルが選択されていません</p>
-              <dl class="file-meta">
-                <div>
-                  <dt>長さ</dt>
-                  <dd id="durationLabel">--:--</dd>
-                </div>
-                <div>
-                  <dt>サンプルレート</dt>
-                  <dd id="sampleRateLabel">-- Hz</dd>
-                </div>
-              </dl>
-            </div>
-          </div>
-
-          <div class="panel controls-panel">
-            <div class="transport">
-              <button class="ghost" id="rewindButton" disabled>リセット</button>
-              <button class="primary" id="playButton" disabled>再生</button>
-              <button class="ghost" id="pauseButton" disabled>一時停止</button>
-            </div>
-            <div class="timeline" aria-live="off">
-              <div class="timeline-current" id="currentTimeLabel">0:00</div>
-              <div class="timeline-track">
-                <div class="timeline-progress" id="timelineProgress"></div>
-              </div>
-              <div class="timeline-duration" id="totalTimeLabel">0:00</div>
-            </div>
-            <div class="toggles">
-              <div class="toggle-card">
-                <div class="toggle-header">
-                  <label class="toggle-switch">
-                    <input type="checkbox" id="spatialToggle" checked />
-                    <span></span>
-                  </label>
-                  <span class="toggle-label">16D 立体音響モード</span>
-                </div>
-                <p class="toggle-copy">
-                  音が前後左右上下を完全に回転する超没入モード。強化された多軸 LFO による立体的なサウンドモーションを採用。
+        <section class="hero" aria-labelledby="hero-title">
+            <div class="hero-overlay"></div>
+            <div class="hero-content">
+                <p class="eyebrow">✨ 16D Immersive Audio + Lumo Perfect Spatial Sound</p>
+                <h1 id="hero-title">音が身体を巡る、<br>次世代の音響制作体験を</h1>
+                <p class="hero-copy">
+                    Lumora Sound Studio 1.0 は、誰でもブラウザ上で立体音響をデザインできるサウンドスタジオです。16D 立体音響と独自の Lumo 音響が織りなす超没入感が、あなたの音を次の次元へ連れていきます。
                 </p>
-              </div>
-              <div class="toggle-card">
-                <div class="toggle-header">
-                  <label class="toggle-switch">
-                    <input type="checkbox" id="lumoToggle" checked />
-                    <span></span>
-                  </label>
-                  <span class="toggle-label">Lumo 完璧立体音響</span>
+                <div class="hero-actions">
+                    <button class="primary-action cta-scroll" data-target="#studio">🎧 スタジオを開く</button>
+                    <button class="secondary-action cta-scroll" data-target="#features">📚 機能を見る</button>
                 </div>
-                <p class="toggle-copy">
-                  強化された低域の重量感、ボーカルの存在感、高域の抜け感に加え、ライブ会場の残響を再現する Lumora 独自の音響プロファイル。
-                </p>
-              </div>
+                <dl class="hero-meta">
+                    <div>
+                        <dt>🔓 アカウント登録不要</dt>
+                        <dd>すべて無料で、無制限に利用可能</dd>
+                    </div>
+                    <div>
+                        <dt>🎵 16D + Lumo</dt>
+                        <dd>回転する音像と完璧な立体感を同時に</dd>
+                    </div>
+                    <div>
+                        <dt>💾 音源分離 & ダウンロード</dt>
+                        <dd>ボーカルも楽器もワンクリックで保存</dd>
+                    </div>
+                </dl>
             </div>
-            <div class="equalizer" aria-labelledby="equalizerTitle">
-              <div class="equalizer-header">
-                <h3 id="equalizerTitle">6 バンド イコライザー</h3>
-                <span class="eq-scale">-12 dB ～ +12 dB</span>
-              </div>
-              <div class="eq-sliders">
-                <div class="eq-slider" data-freq="60">
-                  <label for="eq-0">60 Hz</label>
-                  <input type="range" id="eq-0" data-index="0" min="-12" max="12" value="0" step="0.5" />
-                  <span class="eq-value">0 dB</span>
-                </div>
-                <div class="eq-slider" data-freq="170">
-                  <label for="eq-1">170 Hz</label>
-                  <input type="range" id="eq-1" data-index="1" min="-12" max="12" value="0" step="0.5" />
-                  <span class="eq-value">0 dB</span>
-                </div>
-                <div class="eq-slider" data-freq="350">
-                  <label for="eq-2">350 Hz</label>
-                  <input type="range" id="eq-2" data-index="2" min="-12" max="12" value="0" step="0.5" />
-                  <span class="eq-value">0 dB</span>
-                </div>
-                <div class="eq-slider" data-freq="1000">
-                  <label for="eq-3">1 kHz</label>
-                  <input type="range" id="eq-3" data-index="3" min="-12" max="12" value="0" step="0.5" />
-                  <span class="eq-value">0 dB</span>
-                </div>
-                <div class="eq-slider" data-freq="3500">
-                  <label for="eq-4">3.5 kHz</label>
-                  <input type="range" id="eq-4" data-index="4" min="-12" max="12" value="0" step="0.5" />
-                  <span class="eq-value">0 dB</span>
-                </div>
-                <div class="eq-slider" data-freq="10000">
-                  <label for="eq-5">10 kHz</label>
-                  <input type="range" id="eq-5" data-index="5" min="-12" max="12" value="0" step="0.5" />
-                  <span class="eq-value">0 dB</span>
-                </div>
-              </div>
-            </div>
-            <div class="download-actions">
-              <button class="primary wide" id="downloadProcessed" disabled>加工した音をダウンロード</button>
-              <p class="download-note">すべてローカルで処理され、プライバシーは守られます。</p>
-            </div>
-          </div>
+        </section>
 
-          <div class="panel separation-panel" id="separation">
-            <div class="panel-header">
-              <h3>音源分離 &amp; ダウンロード</h3>
-              <p>ボーカルと楽器をそれぞれ抽出して簡単保存</p>
+        <section id="features" class="features-section">
+            <h2>🚀 主な機能</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🎚️</div>
+                    <h3>16D 立体音響</h3>
+                    <p>360度の完璧な立体音響表現で、音を自由自在に配置</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎼</div>
+                    <h3>Lumo音響</h3>
+                    <p>独自のLumo技術で、究極の立体感を実現</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔊</div>
+                    <h3>リアルタイムプレビュー</h3>
+                    <p>編集結果をその場で確認できるインタラクティブなスタジオ</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎤</div>
+                    <h3>音源分離</h3>
+                    <p>AIが自動でボーカル・楽器を分離</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">💾</div>
+                    <h3>ダウンロード</h3>
+                    <p>高品質で作品をエクスポート</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🌐</div>
+                    <h3>クラウドベース</h3>
+                    <p>どのデバイスからでもアクセス可能</p>
+                </div>
             </div>
-            <p class="panel-copy">
-              Lumora の強化された多段階スマートバンドフィルタリングで、ボーカルと楽器をより精密に抽出。ライブ編集やリミックス制作の下地を高品質で準備できます。
-            </p>
-            <div class="separation-actions">
-              <button class="ghost wide" id="downloadVocals" disabled>ボーカルをダウンロード</button>
-              <button class="ghost wide" id="downloadInstrumentals" disabled>楽器をダウンロード</button>
-            </div>
-            <div class="separation-hint">
-              <p>保存形式：高品質 WAV（ステレオ / 48kHz）。</p>
-              <p>処理はブラウザで完結。クレジット消費なし。</p>
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="section lumo-manifest" aria-labelledby="manifest-title">
-        <div class="section-header">
-          <p class="eyebrow">Immersion</p>
-          <h2 id="manifest-title">シンプルな UI に隠れた、音へのこだわり</h2>
-          <div class="manifest-grid">
-            <article>
-              <h3>ドラッグレス操作</h3>
-              <p>すべての操作はタップとスライドのみ。モバイルでも 16D 立体音響を直感的に操れます。</p>
-            </article>
-            <article>
-              <h3>レスポンシブ設計</h3>
-              <p>デスクトップからスマートフォンまで、余白とコントラストを最適化。夜間の作業も快適です。</p>
-            </article>
-            <article>
-              <h3>ライブモニタリング</h3>
-              <p>設定変更はリアルタイムに反映。音の変化を聴きながら最適なバランスを探せます。</p>
-            </article>
-            <article>
-              <h3>超高速レンダリング</h3>
-              <p>ダウンロードは最短数秒。クリエイティブの勢いを止めない軽快さを実現しました。</p>
-            </article>
-          </div>
-        </div>
-      </section>
+        <section id="studio" class="studio-section">
+            <h2>🎧 スタジオ体験</h2>
+            <div class="studio-container">
+                <p>Lumora Sound Studio 1.0で、あなたの創造力を解放しましょう。</p>
+                <button class="primary-action" onclick="alert('スタジオが起動します')">スタジオを開く →</button>
+            </div>
+        </section>
 
-      <section class="section pricing" id="pricing" aria-labelledby="pricing-title">
-        <div class="section-header">
-          <p class="eyebrow">Pricing</p>
-          <h2 id="pricing-title">必要なのは、完全無料プランだけ。</h2>
-          <p class="section-copy">
-            Lumora Sound Studio 1.0 は完全無料。アカウントもクレジットも不要で、すべての機能が無制限に利用できます。
-          </p>
-        </div>
-        <div class="pricing-card">
-          <div class="pricing-badge">Free Forever</div>
-          <h3>FREE PLAN</h3>
-          <p class="price">¥0 / 無制限</p>
-          <ul class="pricing-list">
-            <li>16D 立体音響 &amp; Lumo 音響が無制限</li>
-            <li>音源分離と WAV ダウンロードが無制限</li>
-            <li>ブラウザ完結。ログイン不要</li>
-            <li>アップロード数、処理時間に制限なし</li>
-          </ul>
-          <button class="primary-action cta-scroll" data-target="#studio">すぐに試す</button>
-        </div>
-      </section>
+        <section id="separation" class="separation-section">
+            <h2>🎵 音源分離の力</h2>
+            <div class="separation-container">
+                <p>高度なAIアルゴリズムを使用して、任意のオーディオから音声とバックグラウンドトラックを分離します。</p>
+                <button class="primary-action" onclick="alert('音源分離ツールが起動します')">今すぐ試す →</button>
+            </div>
+        </section>
+
+        <section id="pricing" class="pricing-section">
+            <h2>💰 料金プラン</h2>
+            <div class="pricing-cards">
+                <div class="pricing-card">
+                    <h3>🎹 フリー</h3>
+                    <p class="price">¥0</p>
+                    <ul>
+                        <li>✓ 基本的な16D音響</li>
+                        <li>✓ ファイルアップロード制限なし</li>
+                        <li>✓ 完全無料</li>
+                    </ul>
+                    <button class="primary-action">今すぐ開始</button>
+                </div>
+                <div class="pricing-card featured">
+                    <h3>🎵 プロ</h3>
+                    <p class="price">¥99<span>/月</span></p>
+                    <ul>
+                        <li>✓ Lumo高度な立体音響</li>
+                        <li>✓ AI音源分離</li>
+                        <li>✓ 高速処理</li>
+                        <li>✓ クラウドストレージ</li>
+                    </ul>
+                    <button class="primary-action">アップグレード</button>
+                </div>
+                <div class="pricing-card">
+                    <h3>🎧 スタジオ</h3>
+                    <p class="price">¥999<span>/月</span></p>
+                    <ul>
+                        <li>✓ 全機能アンロック</li>
+                        <li>✓ 優先サポート</li>
+                        <li>✓ APIアクセス</li>
+                        <li>✓ カスタムブランディング</li>
+                    </ul>
+                    <button class="primary-action">お問い合わせ</button>
+                </div>
+            </div>
+        </section>
     </main>
 
-    <footer class="site-footer">
-      <div class="footer-brand">
-        <span class="brand-mark">Lumora</span>
-        <span>Sound Studio 1.0</span>
-      </div>
-      <p>完全無料で立体音響を。ブラウザひとつで、音の未来が始まります。</p>
-      <div class="footer-meta">
-        <span>© <span id="footerYear"></span> Lumora Collective</span>
-        <span>Made for creators, producers, listeners.</span>
-      </div>
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2024 Arctis Software Group. All rights reserved.</p>
+            <nav>
+                <a href="#">プライバシーポリシー</a>
+                <a href="#">利用規約</a>
+                <a href="#">お問い合わせ</a>
+                <a href="#">Twitter</a>
+            </nav>
+        </div>
     </footer>
 
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
-    <script src="script.js" type="module"></script>
-  </body>
+    <script src="script.js"></script>
+</body>
 </html>
