@@ -89,8 +89,8 @@ const state = {
   },
   reverb: {
     presetId: 'concert-hall',
-    earlyMix: 0.42,
-    reverbMix: 0.6,
+    earlyMix: 0.38,
+    reverbMix: 0.55,
     decay: 1,
     stereoWidth: 1,
     preDelay: 0.032,
@@ -456,73 +456,85 @@ async function createReverbStage(context, options) {
   stage.earlyNetwork = createEarlyReflectionNetwork(context);
   stage.input.connect(stage.earlyNetwork.input);
   stage.earlyMixGain = context.createGain();
-  stage.earlyMixGain.gain.value = options.reverbEarly ?? 0.4;
+  stage.earlyMixGain.gain.value = clamp(options.reverbEarly ?? state.reverb.earlyMix ?? 0.35, 0, 0.85);
   stage.earlyNetwork.output.connect(stage.earlyMixGain);
   stage.earlyMixGain.connect(stage.output);
 
-  stage.preDelay = context.createDelay(1);
-  stage.preDelay.delayTime.value = clamp(options.reverbPreDelay ?? 0.028, 0, 0.25);
+  stage.preDelay = context.createDelay(0.5);
+  stage.preDelay.delayTime.value = clamp(options.reverbPreDelay ?? state.reverb.preDelay ?? 0.03, 0, 0.12);
   stage.input.connect(stage.preDelay);
 
-  stage.lateBus = context.createGain();
-  stage.lateBus.gain.value = clamp(options.reverbMix ?? 0.6, 0, 1.2);
   stage.lateSlots = [createReverbSlot(context), createReverbSlot(context)];
+
+  stage.decayGain = context.createGain();
+  stage.decayGain.gain.value = clamp(options.reverbDecay ?? state.reverb.decay ?? 1, 0.5, 1.35);
+
+  stage.lateMix = context.createGain();
+  stage.mix = clamp(options.reverbMix ?? state.reverb.reverbMix ?? 0.5, 0, 1);
+  stage.lateMix.gain.value = stage.mix;
+
   stage.lateSlots.forEach((slot) => {
     stage.preDelay.connect(slot.convolver);
     slot.convolver.connect(slot.gain);
-    slot.gain.connect(stage.lateBus);
+    slot.gain.connect(stage.decayGain);
   });
-  stage.lateBus.connect(stage.output);
+  stage.decayGain.connect(stage.lateMix);
+  stage.lateMix.connect(stage.output);
 
-  stage.mix = clamp(options.reverbMix ?? 0.6, 0, 1.2);
-  stage.decay = clamp(options.reverbDecay ?? 1, 0.2, 1.6);
   stage.currentPreset = null;
   stage.pendingPreset = null;
 
-  stage.updateLateGains = () => {
+  stage.updateSlotActivity = (activePreset) => {
     const now = context.currentTime;
-    const target = clamp(stage.mix * stage.decay, 0, 1.5);
     stage.lateSlots.forEach((slot) => {
-      const isActive = slot.presetId === stage.currentPreset;
-      const goal = isActive ? target : 0;
+      const isActive = Boolean(activePreset) && slot.presetId === activePreset;
+      const target = isActive ? 1 : 0;
       if (typeof slot.gain.gain.setTargetAtTime === 'function') {
-        slot.gain.gain.setTargetAtTime(goal, now, 0.12);
+        slot.gain.gain.setTargetAtTime(target, now, REVERB_CROSSFADE_TIME);
       } else {
-        slot.gain.gain.value = goal;
+        slot.gain.gain.value = target;
       }
     });
   };
 
   stage.setEarlyMix = (value) => {
-    const now = context.currentTime;
+    const target = clamp(value, 0, 0.85);
     if (typeof stage.earlyMixGain.gain.setTargetAtTime === 'function') {
-      stage.earlyMixGain.gain.setTargetAtTime(clamp(value, 0, 1.2), now, 0.08);
+      stage.earlyMixGain.gain.setTargetAtTime(target, context.currentTime, 0.08);
     } else {
-      stage.earlyMixGain.gain.value = clamp(value, 0, 1.2);
+      stage.earlyMixGain.gain.value = target;
     }
   };
 
   stage.setLateMix = (value) => {
-    stage.mix = clamp(value, 0, 1.5);
-    stage.updateLateGains();
+    stage.mix = clamp(value, 0, 1);
+    if (typeof stage.lateMix.gain.setTargetAtTime === 'function') {
+      stage.lateMix.gain.setTargetAtTime(stage.mix, context.currentTime, 0.12);
+    } else {
+      stage.lateMix.gain.value = stage.mix;
+    }
   };
 
   stage.setDecay = (value) => {
-    stage.decay = clamp(value, 0.2, 1.8);
-    stage.updateLateGains();
+    stage.decay = clamp(value, 0.5, 1.35);
+    if (typeof stage.decayGain.gain.setTargetAtTime === 'function') {
+      stage.decayGain.gain.setTargetAtTime(stage.decay, context.currentTime, 0.12);
+    } else {
+      stage.decayGain.gain.value = stage.decay;
+    }
   };
 
   stage.setPreDelay = (value) => {
-    const target = clamp(value, 0, 0.25);
+    const target = clamp(value, 0, 0.12);
     if (stage.preDelay.delayTime && typeof stage.preDelay.delayTime.setTargetAtTime === 'function') {
-      stage.preDelay.delayTime.setTargetAtTime(target, context.currentTime, 0.06);
+      stage.preDelay.delayTime.setTargetAtTime(target, context.currentTime, 0.08);
     } else {
       stage.preDelay.delayTime.value = target;
     }
   };
 
   stage.setDiffusion = (value) => {
-    const target = clamp(value, 0, 0.6);
+    const target = clamp(value, 0, 0.35);
     if (typeof stage.earlyNetwork.diffusionGain.gain.setTargetAtTime === 'function') {
       stage.earlyNetwork.diffusionGain.gain.setTargetAtTime(target, context.currentTime, 0.08);
     } else {
@@ -532,10 +544,7 @@ async function createReverbStage(context, options) {
 
   stage.loadPreset = async (presetId) => {
     if (!presetId) return;
-    if (stage.currentPreset === presetId && !stage.pendingPreset) {
-      stage.updateLateGains();
-      return;
-    }
+    if (stage.currentPreset === presetId && !stage.pendingPreset) return;
     if (stage.pendingPreset === presetId) return;
     stage.pendingPreset = presetId;
     try {
@@ -543,16 +552,7 @@ async function createReverbStage(context, options) {
       const slot = stage.lateSlots.find((s) => s.presetId !== presetId) || stage.lateSlots[0];
       slot.convolver.buffer = impulse;
       slot.presetId = presetId;
-      const now = context.currentTime;
-      const target = clamp(stage.mix * stage.decay, 0, 1.5);
-      stage.lateSlots.forEach((s) => {
-        const goal = s.presetId === presetId ? target : 0;
-        if (typeof s.gain.gain.setTargetAtTime === 'function') {
-          s.gain.gain.setTargetAtTime(goal, now, REVERB_CROSSFADE_TIME);
-        } else {
-          s.gain.gain.value = goal;
-        }
-      });
+      stage.updateSlotActivity(presetId);
       stage.currentPreset = presetId;
     } catch (error) {
       console.warn('Failed to load reverb preset', error);
@@ -561,12 +561,35 @@ async function createReverbStage(context, options) {
     }
   };
 
-  stage.disconnect = () => {
-    stage.input.disconnect();
-    stage.output.disconnect();
+  stage.dispose = () => {
+    try {
+      stage.input.disconnect();
+    } catch {
+      /* noop */
+    }
+    try {
+      stage.output.disconnect();
+    } catch {
+      /* noop */
+    }
+    try {
+      stage.decayGain.disconnect();
+    } catch {
+      /* noop */
+    }
+    try {
+      stage.lateMix.disconnect();
+    } catch {
+      /* noop */
+    }
   };
 
-  stage.updateLateGains();
+  stage.setEarlyMix(stage.earlyMixGain.gain.value);
+  stage.setLateMix(stage.mix);
+  stage.setDecay(stage.decayGain.gain.value);
+  stage.setPreDelay(stage.preDelay.delayTime.value);
+  stage.setDiffusion(stage.earlyMixGain.gain.value * 0.4 + 0.06);
+  stage.updateSlotActivity(stage.currentPreset);
 
   if (options.reverbPresetId) {
     await stage.loadPreset(options.reverbPresetId);
@@ -664,7 +687,7 @@ function createSpatialStage(context) {
   stage.bypassGain = context.createGain();
   stage.bypassGain.gain.value = 0;
 
-  stage.distanceConfig = { refDistance: 1.1, maxDistance: 32, rolloff: 1.05 };
+  stage.distanceConfig = { refDistance: 1.4, maxDistance: 28, rolloff: 0.85 };
   stage.distanceDry = context.createGain();
   stage.distanceDry.gain.value = 1;
   stage.distanceWet = context.createGain();
@@ -764,12 +787,16 @@ function createSpatialStage(context) {
   };
 
   stage.setDistanceGain = (gainValue) => {
-    const dry = clamp(gainValue, 0, 1);
-    const wet = clamp(lerp(0.35, 1, dry), 0, 1);
+    const dryRaw = clamp(gainValue, 0.12, 1);
+    const wetRaw = clamp(lerp(0.25, 0.85, dryRaw), 0.25, 0.85);
+    const sum = dryRaw + wetRaw;
+    const normaliser = sum > 1.1 ? 1.1 / sum : 1;
+    const dry = dryRaw * normaliser;
+    const wet = wetRaw * normaliser;
     const now = context.currentTime;
     if (typeof stage.distanceDry.gain.setTargetAtTime === 'function') {
-      stage.distanceDry.gain.setTargetAtTime(dry, now, 0.08);
-      stage.distanceWet.gain.setTargetAtTime(wet, now, 0.1);
+      stage.distanceDry.gain.setTargetAtTime(dry, now, 0.09);
+      stage.distanceWet.gain.setTargetAtTime(wet, now, 0.12);
     } else {
       stage.distanceDry.gain.value = dry;
       stage.distanceWet.gain.value = wet;
@@ -1059,17 +1086,19 @@ function applyGraphSettings(graph, context, options, isOffline = false) {
   });
 
   const lumoOn = options.enableLumo;
-  applyParam(nodes.dryGain?.gain, lumoOn ? 0.48 : 1);
-  applyParam(nodes.wetPreGain?.gain, lumoOn ? 1.1 : 0.7);
-  applyParam(nodes.lumoDepthGain?.gain, lumoOn ? 1.24 : 0.85);
-  applyParam(nodes.lumoSubEnhancer?.gain, lumoOn ? 7.2 : 0);
-  applyParam(nodes.lumoLowShelf?.gain, lumoOn ? 8.4 : 0);
-  applyParam(nodes.lumoMidBass?.gain, lumoOn ? 5.8 : 0);
-  applyParam(nodes.lumoPresence?.gain, lumoOn ? 5.6 : 0);
-  applyParam(nodes.lumoAir?.gain, lumoOn ? 4.8 : 0);
+  applyParam(nodes.dryGain?.gain, lumoOn ? 0.62 : 0.9);
+  applyParam(nodes.wetPreGain?.gain, lumoOn ? 0.64 : 0.45);
+  applyParam(nodes.lumoDepthGain?.gain, lumoOn ? 0.92 : 0.5);
+  applyParam(nodes.lumoSubEnhancer?.gain, lumoOn ? 4.8 : 0);
+  applyParam(nodes.lumoLowShelf?.gain, lumoOn ? 5.4 : 0);
+  applyParam(nodes.lumoMidBass?.gain, lumoOn ? 3.6 : 0);
+  applyParam(nodes.lumoPresence?.gain, lumoOn ? 3.4 : 0);
+  applyParam(nodes.lumoAir?.gain, lumoOn ? 2.8 : 0);
 
   if (reverbStage) {
-    reverbStage.setEarlyMix(options.reverbEarly ?? state.reverb.earlyMix);
+    const earlyMixValue = options.reverbEarly ?? state.reverb.earlyMix;
+    reverbStage.setEarlyMix(earlyMixValue);
+    reverbStage.setDiffusion(Math.min(0.35, earlyMixValue * 0.4 + 0.06));
     reverbStage.setLateMix(options.reverbMix ?? state.reverb.reverbMix);
     reverbStage.setDecay(options.reverbDecay ?? state.reverb.decay);
     reverbStage.setPreDelay(options.reverbPreDelay ?? state.reverb.preDelay);
@@ -1083,7 +1112,7 @@ function applyGraphSettings(graph, context, options, isOffline = false) {
     spatialStage.setSpatialEnabled(options.enableSpatial);
   }
 
-  applyParam(nodes.masterGain?.gain, options.masterGain ?? 0.95);
+  applyParam(nodes.masterGain?.gain, options.masterGain ?? 0.82);
 }
 
 async function createAudioGraph(context, buffer, options, { isOffline = false } = {}) {
@@ -1157,7 +1186,8 @@ async function createAudioGraph(context, buffer, options, { isOffline = false } 
   nodes.lumoAir.connect(reverbStage.input);
 
   const spatialStage = createSpatialStage(context);
-  const stereoStage = createStereoWidthStage(context, options.stereoWidth ?? state.reverb.stereoWidth ?? 1);
+  const initialWidth = clamp(options.stereoWidth ?? state.reverb.stereoWidth ?? 1, 0.6, 1.3);
+  const stereoStage = createStereoWidthStage(context, initialWidth);
 
   nodes.dryGain.connect(spatialStage.inputDry);
   nodes.lumoDepthGain.connect(spatialStage.inputDry);
@@ -1166,9 +1196,24 @@ async function createAudioGraph(context, buffer, options, { isOffline = false } 
   spatialStage.output.connect(stereoStage.input);
 
   nodes.masterGain = context.createGain();
-  nodes.masterGain.gain.value = options.masterGain ?? 0.95;
+  nodes.masterGain.gain.value = options.masterGain ?? 0.82;
+
+  nodes.masterLimiter = context.createDynamicsCompressor();
+  if (nodes.masterLimiter) {
+    nodes.masterLimiter.threshold.value = -14;
+    nodes.masterLimiter.knee.value = 24;
+    nodes.masterLimiter.ratio.value = 6;
+    nodes.masterLimiter.attack.value = 0.003;
+    nodes.masterLimiter.release.value = 0.18;
+  }
+
   stereoStage.output.connect(nodes.masterGain);
-  nodes.masterGain.connect(context.destination);
+  if (nodes.masterLimiter) {
+    nodes.masterGain.connect(nodes.masterLimiter);
+    nodes.masterLimiter.connect(context.destination);
+  } else {
+    nodes.masterGain.connect(context.destination);
+  }
 
   const graph = {
     nodes,
@@ -1234,12 +1279,23 @@ function destroyGraph() {
     /* noop */
   }
   try {
+    nodes.masterLimiter?.disconnect();
+  } catch {
+    /* noop */
+  }
+  try {
     spatialStage?.dispose?.();
   } catch {
     /* noop */
   }
   try {
-    graph.reverbStage?.disconnect?.();
+    graph.reverbStage?.dispose?.();
+  } catch {
+    /* noop */
+  }
+  try {
+    graph.stereoStage?.input?.disconnect();
+    graph.stereoStage?.output?.disconnect();
   } catch {
     /* noop */
   }
@@ -1254,7 +1310,7 @@ function getCurrentOptions(overrides = {}) {
     eqValues: [...state.eqValues],
     enableSpatial: state.spatialEnabled,
     enableLumo: state.lumoEnabled,
-    masterGain: 0.95,
+    masterGain: 0.82,
     reverbPresetId: state.reverb.presetId,
     reverbEarly: state.reverb.earlyMix,
     reverbMix: state.reverb.reverbMix,
@@ -1287,11 +1343,24 @@ async function startPlayback(offset = 0) {
 
     state.startTime = context.currentTime - offset;
     state.pausedAt = 0;
+    if (state.scene.sources[0]) {
+      state.scene.sources[0].lastPosition = cloneVec3(state.scene.sources[0].position);
+      state.scene.sources[0].velocity = { x: 0, y: 0, z: 0 };
+    }
     graph.nodes.source.onended = () => {
       if (state.graph === graph) {
         handlePlaybackEnded();
       }
     };
+    try {
+      if (typeof graph.nodes.source.playbackRate?.setValueAtTime === 'function') {
+        graph.nodes.source.playbackRate.setValueAtTime(1, context.currentTime);
+      } else if (graph.nodes.source.playbackRate) {
+        graph.nodes.source.playbackRate.value = 1;
+      }
+    } catch {
+      /* noop */
+    }
     graph.nodes.source.start(0, offset);
     state.isPlaying = true;
     updateButtonStates();
@@ -1394,6 +1463,22 @@ async function renderOffline(options) {
   const graph = await createAudioGraph(offlineContext, buffer, options, { isOffline: true });
   graph.nodes.source.start(0);
   const rendered = await offlineContext.startRendering();
+  try {
+    graph.reverbStage?.dispose?.();
+  } catch {
+    /* noop */
+  }
+  try {
+    graph.spatialStage?.dispose?.();
+  } catch {
+    /* noop */
+  }
+  try {
+    graph.nodes.masterGain?.disconnect();
+    graph.nodes.masterLimiter?.disconnect();
+  } catch {
+    /* noop */
+  }
   return rendered;
 }
 
@@ -1515,7 +1600,7 @@ function updateSliderDisplay(id, value) {
       text = `${value.toFixed(2)}×`;
       break;
     case 'stereoWidth':
-      text = `${Math.round(value * 100)}%`;
+      text = `${value.toFixed(2)}×`;
       break;
     case 'listenerYaw':
     case 'listenerPitch':
@@ -1560,6 +1645,10 @@ async function populateReverbPresets() {
     ui.reverbPreset.appendChild(option);
   });
   if (presets.length === 0) {
+    const emptyOption = document.createElement('option');
+    emptyOption.value = '';
+    emptyOption.textContent = 'プリセットなし';
+    ui.reverbPreset.appendChild(emptyOption);
     ui.reverbPreset.disabled = true;
     updateReverbDescription(null);
     return metadata;
@@ -1578,21 +1667,32 @@ async function populateReverbPresets() {
 function applyReverbPresetDefaults(preset, { updateControls = true } = {}) {
   if (!preset) return;
   state.reverb.presetId = preset.id;
+  const earlyBounds = ui.reverbEarly
+    ? [Number(ui.reverbEarly.min), Number(ui.reverbEarly.max)]
+    : [0, 0.85];
+  const mixBounds = ui.reverbMix ? [Number(ui.reverbMix.min), Number(ui.reverbMix.max)] : [0, 1];
+  const widthBounds = ui.stereoWidth
+    ? [Number(ui.stereoWidth.min), Number(ui.stereoWidth.max)]
+    : [0.6, 1.3];
+  const decayBounds = ui.reverbDecay
+    ? [Number(ui.reverbDecay.min), Number(ui.reverbDecay.max)]
+    : [0.5, 1.35];
+
   if (typeof preset.defaultEarlyMix === 'number') {
-    state.reverb.earlyMix = preset.defaultEarlyMix;
+    state.reverb.earlyMix = clamp(preset.defaultEarlyMix, earlyBounds[0], earlyBounds[1]);
   }
   if (typeof preset.defaultReverbMix === 'number') {
-    state.reverb.reverbMix = preset.defaultReverbMix;
+    state.reverb.reverbMix = clamp(preset.defaultReverbMix, mixBounds[0], mixBounds[1]);
   }
   if (typeof preset.defaultWidth === 'number') {
-    state.reverb.stereoWidth = preset.defaultWidth;
+    state.reverb.stereoWidth = clamp(preset.defaultWidth, widthBounds[0], widthBounds[1]);
   }
   if (typeof preset.decaySeconds === 'number') {
-    const normalizedDecay = clamp(preset.decaySeconds / 1.6, 0.4, 1.6);
-    state.reverb.decay = normalizedDecay;
+    const normalizedDecay = preset.decaySeconds / 2;
+    state.reverb.decay = clamp(normalizedDecay, decayBounds[0], decayBounds[1]);
   }
   if (typeof preset.recommendedPreDelay === 'number') {
-    state.reverb.preDelay = preset.recommendedPreDelay;
+    state.reverb.preDelay = clamp(preset.recommendedPreDelay, 0, 0.12);
   }
   if (updateControls) {
     if (ui.reverbEarly) {
@@ -1620,14 +1720,18 @@ async function setupReverbControls() {
   const presets = metadata?.presets ?? [];
 
   if (ui.reverbEarly) {
+    const min = Number(ui.reverbEarly.min);
+    const max = Number(ui.reverbEarly.max);
+    state.reverb.earlyMix = clamp(state.reverb.earlyMix, min, max);
     ui.reverbEarly.value = state.reverb.earlyMix;
     updateSliderDisplay('reverbEarly', state.reverb.earlyMix);
     ui.reverbEarly.addEventListener('input', (event) => {
-      const value = Number(event.target.value);
+      const value = clamp(Number(event.target.value), min, max);
       state.reverb.earlyMix = value;
       updateSliderDisplay('reverbEarly', value);
       if (state.graph?.reverbStage) {
         state.graph.reverbStage.setEarlyMix(value);
+        state.graph.reverbStage.setDiffusion(Math.min(0.35, value * 0.4 + 0.06));
       }
       if (state.graph?.nodes && state.audioContext) {
         applyGraphSettings(state.graph, state.audioContext, getCurrentOptions());
@@ -1636,10 +1740,13 @@ async function setupReverbControls() {
   }
 
   if (ui.reverbMix) {
+    const min = Number(ui.reverbMix.min);
+    const max = Number(ui.reverbMix.max);
+    state.reverb.reverbMix = clamp(state.reverb.reverbMix, min, max);
     ui.reverbMix.value = state.reverb.reverbMix;
     updateSliderDisplay('reverbMix', state.reverb.reverbMix);
     ui.reverbMix.addEventListener('input', (event) => {
-      const value = Number(event.target.value);
+      const value = clamp(Number(event.target.value), min, max);
       state.reverb.reverbMix = value;
       updateSliderDisplay('reverbMix', value);
       if (state.graph?.reverbStage) {
@@ -1652,10 +1759,13 @@ async function setupReverbControls() {
   }
 
   if (ui.reverbDecay) {
+    const min = Number(ui.reverbDecay.min);
+    const max = Number(ui.reverbDecay.max);
+    state.reverb.decay = clamp(state.reverb.decay, min, max);
     ui.reverbDecay.value = state.reverb.decay;
     updateSliderDisplay('reverbDecay', state.reverb.decay);
     ui.reverbDecay.addEventListener('input', (event) => {
-      const value = Number(event.target.value);
+      const value = clamp(Number(event.target.value), min, max);
       state.reverb.decay = value;
       updateSliderDisplay('reverbDecay', value);
       if (state.graph?.reverbStage) {
@@ -1668,10 +1778,13 @@ async function setupReverbControls() {
   }
 
   if (ui.stereoWidth) {
+    const min = Number(ui.stereoWidth.min);
+    const max = Number(ui.stereoWidth.max);
+    state.reverb.stereoWidth = clamp(state.reverb.stereoWidth, min, max);
     ui.stereoWidth.value = state.reverb.stereoWidth;
     updateSliderDisplay('stereoWidth', state.reverb.stereoWidth);
     ui.stereoWidth.addEventListener('input', (event) => {
-      const value = Number(event.target.value);
+      const value = clamp(Number(event.target.value), min, max);
       state.reverb.stereoWidth = value;
       updateSliderDisplay('stereoWidth', value);
       if (state.graph?.stereoStage) {
@@ -1722,6 +1835,7 @@ function resizeSpaceCanvas() {
   state.spaceView.scale = scale;
   state.spaceView.originX = rect.width / 2;
   state.spaceView.originY = rect.height * 0.75;
+  drawSpaceScene();
 }
 
 function updateSpaceMeta() {
@@ -1867,22 +1981,40 @@ function updateSceneDynamics(deltaTime) {
   updateSpatialStageForState();
 
   const playbackRateParam = state.graph.nodes.source?.playbackRate;
-  if (playbackRateParam && state.audioContext) {
-    const listener = state.scene.listener;
-    const rel = subtractVec3(source.position, listener.position);
-    const direction = normalizeVec3(rel);
-    const radialVelocity = dotVec3(source.velocity, direction);
-    const limited = clamp(radialVelocity, -SPEED_OF_SOUND * 0.45, SPEED_OF_SOUND * 0.45);
-    const dopplerFactor = clamp(
-      SPEED_OF_SOUND / (SPEED_OF_SOUND - limited || SPEED_OF_SOUND),
-      1 - MAX_DOPPLER_SHIFT,
-      1 + MAX_DOPPLER_SHIFT
-    );
-    if (typeof playbackRateParam.setTargetAtTime === 'function') {
-      playbackRateParam.setTargetAtTime(dopplerFactor, state.audioContext.currentTime, 0.12);
-    } else {
-      playbackRateParam.value = dopplerFactor;
+  if (!playbackRateParam || !state.audioContext) {
+    return;
+  }
+
+  if (!state.isPlaying) {
+    try {
+      if (typeof playbackRateParam.cancelScheduledValues === 'function') {
+        playbackRateParam.cancelScheduledValues(0);
+      }
+      if (typeof playbackRateParam.setValueAtTime === 'function') {
+        playbackRateParam.setValueAtTime(1, state.audioContext.currentTime);
+      } else {
+        playbackRateParam.value = 1;
+      }
+    } catch {
+      playbackRateParam.value = 1;
     }
+    return;
+  }
+
+  const listener = state.scene.listener;
+  const rel = subtractVec3(source.position, listener.position);
+  const direction = normalizeVec3(rel);
+  const radialVelocity = dotVec3(source.velocity, direction);
+  const limited = clamp(radialVelocity, -SPEED_OF_SOUND * 0.45, SPEED_OF_SOUND * 0.45);
+  const dopplerFactor = clamp(
+    SPEED_OF_SOUND / (SPEED_OF_SOUND - limited || SPEED_OF_SOUND),
+    1 - MAX_DOPPLER_SHIFT,
+    1 + MAX_DOPPLER_SHIFT
+  );
+  if (typeof playbackRateParam.setTargetAtTime === 'function') {
+    playbackRateParam.setTargetAtTime(dopplerFactor, state.audioContext.currentTime, 0.12);
+  } else {
+    playbackRateParam.value = dopplerFactor;
   }
 }
 
@@ -1891,16 +2023,16 @@ function updatePreviewMotion(deltaTime) {
   const source = state.scene.sources[0];
   if (!source) return;
   state.preview.phase += deltaTime * PREVIEW_SPEED;
-  const radius = 1.6;
+  const radius = 1.4;
   source.position.x = DEFAULT_SOURCE_POSITION.x + Math.cos(state.preview.phase) * radius;
-  source.position.z = DEFAULT_SOURCE_POSITION.z + Math.sin(state.preview.phase) * (radius * 0.8);
+  source.position.z = DEFAULT_SOURCE_POSITION.z + Math.sin(state.preview.phase) * (radius * 0.75);
   source.position.y = clamp(
-    DEFAULT_SOURCE_POSITION.y + Math.sin(state.preview.phase * 1.7) * 0.4,
+    DEFAULT_SOURCE_POSITION.y + Math.sin(state.preview.phase * 1.7) * 0.32,
     ROOM_BOUNDS.y[0],
     ROOM_BOUNDS.y[1]
   );
-  state.scene.listener.orientation.yaw = clamp(Math.sin(state.preview.phase * 0.6) * 35, -90, 90);
-  state.scene.listener.orientation.pitch = clamp(Math.sin(state.preview.phase * 0.4) * 12, -40, 40);
+  state.scene.listener.orientation.yaw = clamp(Math.sin(state.preview.phase * 0.6) * 25, -75, 75);
+  state.scene.listener.orientation.pitch = clamp(Math.sin(state.preview.phase * 0.4) * 8, -30, 30);
 
   if (ui.sourceHeight) {
     ui.sourceHeight.value = source.position.y;
@@ -1963,6 +2095,7 @@ function resetSpaceState() {
   }
   updateSpatialStageForState();
   updateSpaceMeta();
+  drawSpaceScene();
 }
 
 function togglePreview(enabled) {
@@ -1996,6 +2129,7 @@ function togglePreview(enabled) {
     state.preview.storedOrientation = null;
     updateSpatialStageForState();
   }
+  drawSpaceScene();
 }
 
 function setupSpacePanel() {
@@ -2038,9 +2172,8 @@ function setupSpacePanel() {
     ui.sourceHeight.addEventListener('input', (event) => {
       const value = Number(event.target.value);
       state.scene.sources[0].position.y = clamp(value, ROOM_BOUNDS.y[0], ROOM_BOUNDS.y[1]);
-      if (!state.isPlaying) {
-        state.scene.sources[0].lastPosition = cloneVec3(state.scene.sources[0].position);
-      }
+      state.scene.sources[0].lastPosition = cloneVec3(state.scene.sources[0].position);
+      state.scene.sources[0].velocity = { x: 0, y: 0, z: 0 };
       updateSliderDisplay('sourceHeight', state.scene.sources[0].position.y);
       updateSpaceMeta();
       updateSpatialStageForState();
@@ -2071,13 +2204,13 @@ function setupSpacePanel() {
     const worldZ = -((canvasY - originY) / scale) + centerZ + (currentHeight * HEIGHT_PROJECT_SCALE) / scale;
     state.scene.sources[0].position.x = clamp(worldX, ROOM_BOUNDS.x[0], ROOM_BOUNDS.x[1]);
     state.scene.sources[0].position.z = clamp(worldZ, ROOM_BOUNDS.z[0], ROOM_BOUNDS.z[1]);
-    if (!state.isPlaying) {
-      state.scene.sources[0].lastPosition = cloneVec3(state.scene.sources[0].position);
-    }
+    state.scene.sources[0].lastPosition = cloneVec3(state.scene.sources[0].position);
+    state.scene.sources[0].velocity = { x: 0, y: 0, z: 0 };
     updateSpaceMeta();
     if (!state.preview.enabled) {
       updateSpatialStageForState();
     }
+    drawSpaceScene();
   };
 
   // pointer handling
@@ -2105,12 +2238,14 @@ function setupSpacePanel() {
       if (state.preview.enabled) {
         togglePreview(false);
       }
+      event.preventDefault();
       handlePointer(event);
     }
   });
 
   canvas.addEventListener('pointermove', (event) => {
     if (!state.isDraggingSource || state.draggingPointerId !== event.pointerId) return;
+    event.preventDefault();
     handlePointer(event);
   });
 

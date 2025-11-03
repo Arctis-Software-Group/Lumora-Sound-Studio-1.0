@@ -588,6 +588,47 @@ button.cta-scroll {
   gap: 16px;
 }
 
+.reverb-slider-grid.reverb-main {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.reverb-advanced {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.reverb-advanced summary {
+  list-style: none;
+  font-weight: 600;
+  color: var(--text-soft);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s ease;
+  user-select: none;
+}
+
+.reverb-advanced summary::after {
+  content: '\25BE';
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+}
+
+.reverb-advanced[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.reverb-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.reverb-advanced summary:hover,
+.space-advanced summary:hover {
+  color: var(--text-muted);
+}
+
 .slider-control {
   display: grid;
   gap: 8px;
@@ -623,7 +664,7 @@ button.cta-scroll {
 
 .space-controls {
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 
 .space-row {
@@ -636,13 +677,60 @@ button.cta-scroll {
   flex: 1 1 160px;
 }
 
+.space-hint {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
 .space-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 14px;
 }
 
+.space-advanced .space-grid {
+  margin-top: 12px;
+}
+
+.space-advanced {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 12px;
+}
+
+.space-advanced summary {
+  list-style: none;
+  font-weight: 600;
+  color: var(--text-soft);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+.space-advanced summary::after {
+  content: '\25BE';
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+}
+
+.space-advanced[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.space-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.reverb-advanced summary:focus-visible,
+.space-advanced summary:focus-visible {
+  outline: 2px solid rgba(17, 17, 17, 0.2);
+  outline-offset: 4px;
+}
+
 .space-meta {
+  margin: 0;
   font-size: 0.9rem;
   color: var(--text-muted);
   background: rgba(247, 247, 247, 0.95);
